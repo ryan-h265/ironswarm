@@ -1,0 +1,101 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ironswarm"
+dynamic = ["version"]
+description = 'Distributed HTTP load testing framework with journey-based scenarios'
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["load-testing", "performance", "http", "distributed", "async"]
+authors = [
+  { name = "Ryan Linnit", email = "ryan.linnit@sky.uk" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: Testing",
+  "Topic :: System :: Distributed Computing",
+  "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+  "aiohttp",
+  "pyzmq",
+  "msgpack>=1.0.0",
+]
+
+[project.urls]
+Documentation = "https://github.com/ryan-h265/ironswarm#readme"
+Issues = "https://github.com/ryan-h265/ironswarm/issues"
+Source = "https://github.com/ryan-h265/ironswarm"
+
+[project.scripts]
+ironswarm = "ironswarm.__init__:main"
+
+[tool.hatch.version]
+path = "src/ironswarm/__about__.py"
+
+[tool.hatch.envs.test]
+dependencies = [
+  "pytest",
+  "pytest-asyncio",
+  "pytest-cov",
+]
+
+[tool.hatch.envs.hatch-test]
+dependencies = [
+  "pytest",
+  "pytest-asyncio",
+  "pytest-cov",
+]
+
+[tool.hatch.envs.types]
+extra-dependencies = [
+  "mypy>=1.0.0",
+  "pytest",
+]
+[tool.hatch.envs.types.scripts]
+check = "mypy --install-types --non-interactive {args:src/ironswarm tests}"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ironswarm"]
+
+[tool.coverage.run]
+source_pkgs = ["ironswarm", "tests"]
+branch = true
+parallel = true
+omit = [
+  "src/ironswarm/__about__.py",
+]
+
+[tool.coverage.paths]
+ironswarm = ["src/ironswarm", "*/ironswarm/src/ironswarm"]
+tests = ["tests", "*/ironswarm/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "no cov",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+disallow_untyped_calls = false
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = false
