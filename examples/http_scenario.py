@@ -9,7 +9,6 @@ scenario = Scenario(
     journeys=[
         Journey("http_scenario:head", None, VolumeModel(target=1, duration=60)),
         Journey("http_scenario:get", None, VolumeModel(target=3, duration=60)),
-        Journey("http_scenario:get_param", None, VolumeModel(target=3, duration=60)),
     ],
     delay=2,
 )

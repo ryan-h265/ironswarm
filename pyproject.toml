@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 keywords = ["load-testing", "performance", "http", "distributed", "async"]
 authors = [
-  { name = "Ryan Linnit", email = "ryan.linnit@sky.uk" },
+  { name = "Ryan", email = "ryan@h265.email" },
 ]
 classifiers = [
   "Development Status :: 4 - Beta",
@@ -28,13 +28,13 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
-  "aiohttp",
-  "pyzmq",
+  "aiohttp>=3.13.0",
+  "pyzmq>=27.1.0",
   "msgpack>=1.0.0",
 ]
 
 [project.optional-dependencies]
-graphs = ["matplotlib"]
+graphs = ["matplotlib>=3.10.0"]
 
 [project.urls]
 Documentation = "https://github.com/ryan-h265/ironswarm#readme"

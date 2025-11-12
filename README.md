@@ -18,6 +18,10 @@
 
 - [Installation](#installation)
 - [Usage](#usage)
+- [Docker](#docker)
+- [Development](#development)
+- [License](#license)
+
 
 ## Installation
 
@@ -58,6 +62,42 @@ Run a single node bootstrapping to another node
 ironswarm -H local -b tcp://127.0.0.1:42042
 ```
 
+## Docker
+
+Pull the latest image:
+```bash
+docker pull ghcr.io/ryan-h265/ironswarm:latest
+```
+
+Run the latest image:
+```bash
+docker run -it ghcr.io/ryan-h265/ironswarm:latest ironswarm -H local
+```
+
+#### Running with Custom Scenario Files
+
+To run the container with your own scenario files, copy them into the running container:
+
+1. Start the container with a name:
+```bash
+docker run -d --name ironswarm-node ghcr.io/ryan-h265/ironswarm:latest tail -f /dev/null
+```
+
+2. Copy your scenario file into the container:
+```bash
+docker cp examples/http_scenario.py ironswarm-node:/usr/src/app/http_scenario.py
+```
+
+3. Execute ironswarm with your scenario:
+```bash
+docker exec -it ironswarm-node ironswarm -j http_scenario:scenario -H local
+```
+
+4. Clean up when done:
+```bash
+docker stop ironswarm-node
+docker rm ironswarm-node
+```
 
 ## Development
 
@@ -67,47 +107,6 @@ hatch run types:check
 hatch test --cover
 ```
 
-## CI/CD
+## License
 
-This project uses GitHub Actions for automated testing, Docker builds, and releases.
-
-### Automated Testing
-
-Tests run automatically on every push and pull request to all branches:
-- Tests execute on Python 3.10, 3.11, and 3.12
-- Coverage reports upload to Codecov
-- Type checking with mypy
-- Code formatting checks with Ruff
-
-### Docker Builds
-
-Docker images build automatically and publish to GitHub Container Registry (ghcr.io):
-- **On push to master/main**: Builds and pushes with `latest` tag
-- **On version tags (v*)**: Builds and pushes with semantic version tags (e.g., `1.2.3`, `1.2`, `1`)
-- **Multi-platform**: Supports both `linux/amd64` and `linux/arm64`
-- **Pull requests**: Builds only (no push) to validate Dockerfile
-
-Pull the latest image:
-```bash
-docker pull ghcr.io/ryan-h265/ironswarm:latest
-```
-
-### Publishing Releases
-
-Releases to PyPI are automated using [trusted publishing](https://docs.pypi.org/trusted-publishers/) (no API tokens required):
-
-1. **Create a new release on GitHub** with a version tag (e.g., `v1.2.3`)
-2. The release workflow automatically:
-   - Builds the package with Hatch
-   - Validates the distribution with twine
-   - Publishes to PyPI using OIDC authentication
-
-**Test releases**: You can manually trigger the release workflow and enable the "test-pypi" option to publish to TestPyPI for validation.
-
-### Dependabot
-
-Automated dependency updates run weekly for:
-- GitHub Actions (workflow dependencies)
-- Python packages (pip dependencies)
-
-Updates create pull requests automatically with grouped test dependencies to reduce PR noise.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

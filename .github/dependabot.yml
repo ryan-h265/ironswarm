@@ -9,9 +9,6 @@ updates:
     commit-message:
       prefix: "ci"
       include: "scope"
-    labels:
-      - "dependencies"
-      - "github-actions"
 
   # Python dependencies
   - package-ecosystem: "pip"
@@ -21,9 +18,6 @@ updates:
     commit-message:
       prefix: "deps"
       include: "scope"
-    labels:
-      - "dependencies"
-      - "python"
     # Group updates to reduce PR noise
     groups:
       test-dependencies:
