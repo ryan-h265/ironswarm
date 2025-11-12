@@ -1,10 +1,13 @@
 import argparse
 import asyncio
+import json
 import logging
 import os
 import sys
+from pathlib import Path
 
 from ironswarm.logging_config import configure_logging
+from ironswarm.metrics.collector import collector
 from ironswarm.node import Node
 
 log = logging.getLogger(__name__)
@@ -56,6 +59,12 @@ def parse_arguments():
     parser.add_argument(
         "--log-file", default=None, help="Optional path to write logs to a file."
     )
+    parser.add_argument(
+        "--metrics-snapshot",
+        help="Path to write aggregated metrics when the node exits.",
+        type=str,
+        default=None,
+    )
 
     return parser.parse_args()
 
@@ -87,8 +96,16 @@ async def async_main():
         await node.run()
     except KeyboardInterrupt:
         log.info("Received shutdown signal...")
+    finally:
         await node.shutdown()
         log.info("Node shutdown gracefully.")
+        if args.metrics_snapshot:
+            snapshot_path = Path(args.metrics_snapshot)
+            if snapshot_path.parent:
+                snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+            snapshot = collector.snapshot()
+            snapshot_path.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
+            log.info("Metrics snapshot written to %s", snapshot_path)
 
 
 def main():

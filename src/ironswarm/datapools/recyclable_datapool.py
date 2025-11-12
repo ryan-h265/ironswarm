@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from itertools import chain, islice
+from itertools import chain
 
 from ironswarm.datapools.iterable_datapool import IterableDatapool
 

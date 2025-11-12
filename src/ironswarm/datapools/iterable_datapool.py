@@ -1,6 +1,5 @@
 from collections.abc import Iterable
 from functools import lru_cache
-from itertools import islice
 
 from ironswarm.datapools.base_datapool import DatapoolBase
 

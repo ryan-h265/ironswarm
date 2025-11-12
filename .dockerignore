@@ -1,0 +1,54 @@
+# Git
+.git/
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Testing
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation and configs (not needed in container)
+CLAUDE.md
+TECH_DEBT.md
+OBSERVABILITY_NEXT_STEPS.md
+PUBLISHING.md
+PUBLISH_QUICKSTART.md
+ANALYSIS.md
+
+# Scripts (not needed in container)
+*.sh
+*.py
+!src/**/*.py
+
+# Kubernetes/Helm
+helm/
+k8_resources/
+
+# CI/CD
+.github/
+
+# Misc
+.claude/
+journey_logging/

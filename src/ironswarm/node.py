@@ -8,7 +8,6 @@ from datetime import datetime
 from typing import Any, Literal
 
 from ironswarm.helper import ip_address
-from ironswarm.journey.http import http_session
 from ironswarm.lwwelementset import LWWElementSet
 from ironswarm.scheduler import Scheduler
 from ironswarm.transport import Transport

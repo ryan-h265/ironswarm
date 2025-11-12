@@ -214,3 +214,5 @@ __marimo__/
 
 
 journey_logging/
+metrics_graphs/
+metrics_snapshot.json

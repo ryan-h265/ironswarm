@@ -5,9 +5,11 @@ import importlib
 import logging
 import time
 from collections import namedtuple
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 from ironswarm.context import Context
+from ironswarm.metrics.events import record_journey_failure, record_journey_success
 from ironswarm.scenario import Journey, Scenario
 from ironswarm.types import NodeType
 from ironswarm.volumemodel import JourneyComplete
@@ -123,7 +125,13 @@ class ScenarioManager:
             for _ in range(sub_interval_volume):
                 # Create fresh Context for each journey execution
                 # Provides unique trace ID and isolated resources
-                context = Context(metadata={"scenario": self.scenario.__class__.__name__})
+                context = Context(
+                    metadata={
+                        "scenario": self.scenario.__class__.__name__,
+                        "journey_spec": journey_spec,
+                        "node": self.node.identity,
+                    }
+                )
 
                 if datapool_chunk:
                     try:
@@ -162,10 +170,16 @@ class ScenarioManager:
         Returns:
             Return value from journey function.
         """
+        start = time.perf_counter()
         try:
             async with context:
-                return await journey_func(context, *args)
+                result = await journey_func(context, *args)
+            duration = time.perf_counter() - start
+            record_journey_success(context, duration)
+            return result
         except Exception as e:
+            duration = time.perf_counter() - start
+            record_journey_failure(context, duration, error=e)
             log.error(f"Journey {journey_func.__name__} failed: {e}", exc_info=True)
 
     async def cancel_tasks(self) -> None:

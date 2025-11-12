@@ -1,7 +1,5 @@
 import asyncio
 import logging
-from collections.abc import Coroutine
-
 from typing import Any
 
 from ironswarm.scenario import Scenario

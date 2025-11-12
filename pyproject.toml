@@ -18,6 +18,8 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
   "Intended Audience :: Developers",
@@ -31,6 +33,9 @@ dependencies = [
   "msgpack>=1.0.0",
 ]
 
+[project.optional-dependencies]
+graphs = ["matplotlib"]
+
 [project.urls]
 Documentation = "https://github.com/ryan-h265/ironswarm#readme"
 Issues = "https://github.com/ryan-h265/ironswarm/issues"
@@ -38,6 +43,8 @@ Source = "https://github.com/ryan-h265/ironswarm"
 
 [project.scripts]
 ironswarm = "ironswarm.__init__:main"
+ironswarm-metrics-report = "ironswarm.metrics.report:main"
+ironswarm-metrics-graphs = "ironswarm.metrics.graphs:main"
 
 [tool.hatch.version]
 path = "src/ironswarm/__about__.py"

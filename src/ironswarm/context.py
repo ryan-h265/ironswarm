@@ -8,9 +8,12 @@ import asyncio
 import logging
 import time
 import uuid
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import aiohttp
+
+from ironswarm.metrics.events import record_http_request
 
 log = logging.getLogger(__name__)
 
@@ -130,12 +133,24 @@ class Context:
                 elapsed = asyncio.get_event_loop().time() - trace_config_ctx.start
                 if hasattr(params, "response") and params.response is not None:
                     params.response.elapsed = elapsed  # type: ignore[attr-defined]
-                    self.record_metric("http_request_duration_seconds", elapsed)
+                    labels = {
+                        "method": params.method,
+                        "status": str(params.response.status),
+                    }
+                    self.record_metric("http_request_duration_seconds", elapsed, labels=labels)
                     self.log(
                         f"HTTP {params.method} {params.url} -> {params.response.status} ({elapsed:.3f}s)",
                         level=logging.DEBUG,
                         status=params.response.status,
                         duration=elapsed,
+                    )
+                    record_http_request(
+                        self,
+                        params.method,
+                        params.url,
+                        params.response.status,
+                        elapsed,
+                        timestamp=time.time(),
                     )
 
             trace_config.on_request_start.append(on_request_start)

@@ -23,12 +23,10 @@ MAX_STRING_LENGTH = 1024  # Max length for string keys/values
 
 class SerializationError(Exception):
     """Raised when serialization/deserialization fails."""
-    pass
 
 
 class ValidationError(Exception):
     """Raised when schema validation fails."""
-    pass
 
 
 def validate_lww_dict(data: Any, context: str = "root") -> None:
