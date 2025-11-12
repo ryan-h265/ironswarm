@@ -7,9 +7,6 @@ and don't introduce regressions.
 
 import time
 
-import pytest
-
-from ironswarm.lwwelementset import LWWElementSet
 from ironswarm.node import Node
 from ironswarm.volumemodel import DynamicVolumeModel, VolumeModel
 
@@ -166,6 +163,7 @@ class TestConnectionPooling:
     def test_connection_pooling_mock(self):
         """Test connection pooling behavior with mocks."""
         from unittest.mock import MagicMock
+
         from ironswarm.transport.zmq import ZMQTransport
 
         transport = ZMQTransport(host="127.0.0.1", port=5555, identity=b"test")
@@ -201,6 +199,7 @@ class TestConnectionPooling:
     def test_close_disconnects_all_pooled_connections(self):
         """Test that close() disconnects all pooled connections."""
         from unittest.mock import MagicMock
+
         from ironswarm.transport.zmq import ZMQTransport
 
         transport = ZMQTransport(host="127.0.0.1", port=5555, identity=b"test")

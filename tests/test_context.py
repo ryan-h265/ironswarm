@@ -1,13 +1,12 @@
 import asyncio
 import logging
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import aiohttp
 import pytest
 
 from ironswarm.context import Context
-
 
 # ============================================================================
 # Initialization Tests

@@ -9,7 +9,6 @@ from ironswarm.scenario import Journey, Scenario
 from ironswarm.scheduler import Scheduler
 from ironswarm.volumemodel import VolumeModel
 
-
 # Test scenario for scheduler tests - can be imported via spec_import
 test_scenario = Scenario(
     journeys=[

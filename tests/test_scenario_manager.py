@@ -6,7 +6,7 @@ import pytest
 
 from ironswarm.datapools import IterableDatapool
 from ironswarm.scenario import Journey, Scenario
-from ironswarm.scenario_manager import ScenarioManager, spec_import, node_target_volume
+from ironswarm.scenario_manager import ScenarioManager, node_target_volume, spec_import
 from ironswarm.volumemodel import VolumeModel
 
 
@@ -25,9 +25,10 @@ async def dummy_journey3(ctx, data):
 
 # Minimal mock node class for ScenarioManager
 class MockNode:
-    def __init__(self, index=0, count=1):
+    def __init__(self, index=0, count=1, identity="mock-node"):
         self._index = index
         self._count = count
+        self.identity = identity
 
     @property
     def index(self):
@@ -526,4 +527,3 @@ class TestNodeTargetVolume:
             f"Expected spread <= {max_acceptable_spread} (much better than original bug spread of {num_journeys}). "
             f"Distribution: {work_per_node}"
         )
-
