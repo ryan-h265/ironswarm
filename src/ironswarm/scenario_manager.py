@@ -58,6 +58,9 @@ class ScenarioManager:
         # Track background tasks for graceful shutdown
         self._background_tasks: set[asyncio.Task[Any]] = set()
 
+        # Event to signal immediate termination
+        self._stop_event: asyncio.Event = asyncio.Event()
+
     def work_index(self) -> int:
         return int(self.elapsed // self.scenario.interval)
 
@@ -72,7 +75,34 @@ class ScenarioManager:
             # calculate time until next work interval
             time_until_next_interval = self.scenario.interval - self.elapsed % self.scenario.interval
             log.debug(f"Time until next work interval: {time_until_next_interval}")
-            await asyncio.sleep(time_until_next_interval)
+
+            # Wait for either the interval sleep OR the stop event (whichever comes first)
+            sleep_task = asyncio.create_task(asyncio.sleep(time_until_next_interval))
+            stop_task = asyncio.create_task(self._stop_event.wait())
+
+            try:
+                done, pending = await asyncio.wait(
+                    {sleep_task, stop_task},
+                    return_when=asyncio.FIRST_COMPLETED
+                )
+
+                # Cancel the task that didn't complete
+                for task in pending:
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
+
+                # If stop event was triggered, exit immediately
+                if stop_task in done:
+                    log.info("Scenario termination requested, exiting immediately")
+                    break
+            except asyncio.CancelledError:
+                # Handle cancellation of the entire resolve task
+                sleep_task.cancel()
+                stop_task.cancel()
+                break
 
             await self._resolve()
 
@@ -183,7 +213,11 @@ class ScenarioManager:
             log.error(f"Journey {journey_func.__name__} failed: {e}", exc_info=True)
 
     async def cancel_tasks(self) -> None:
-        """Cancel all background tasks gracefully."""
+        """Cancel all background tasks gracefully and signal immediate termination."""
+        # Signal immediate termination of the resolve loop
+        self._stop_event.set()
+        self.running = False
+
         if not self._background_tasks:
             return
 
@@ -267,6 +301,7 @@ class ScenarioManager:
         if scenario_complete:
             log.warning("Scenario complete, no more work to be done")
             self.running = False
+            self._stop_event.set()
 
         return work_interval
 

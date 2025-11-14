@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 MAX_MESSAGE_SIZE = 10 * 1024 * 1024  # 10MB max message size
 MAX_COLLECTION_SIZE = 100_000  # Max items in add_set/remove_set
 MAX_METADATA_KEYS = 50  # Max keys in metadata dict
-MAX_STRING_LENGTH = 1024  # Max length for string keys/values
+MAX_STRING_LENGTH = 10 * 1024  # 10KB - Allow for metrics snapshots with histogram data
 
 
 class SerializationError(Exception):
