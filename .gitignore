@@ -215,7 +215,7 @@ __marimo__/
 
 journey_logging/
 metrics_graphs/
-metrics/
+/metrics/
 
 # Frontend (Node.js / Vue.js)
 # =============================
