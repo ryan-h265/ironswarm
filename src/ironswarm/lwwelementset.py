@@ -110,10 +110,14 @@ class LWWElementSet:
 
         Returns:
             Dictionary with 'add_set' and 'remove_set' keys.
+
+        Note:
+            Filters out entries without timestamps to prevent serialization
+            of empty dicts created by defaultdict access.
         """
         return {
-            "add_set": dict(self.add_set),
-            "remove_set": dict(self.remove_set),
+            "add_set": {k: v for k, v in self.add_set.items() if v.get("timestamp")},
+            "remove_set": {k: v for k, v in self.remove_set.items() if v.get("timestamp")},
         }
 
     @classmethod

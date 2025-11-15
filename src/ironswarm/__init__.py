@@ -60,9 +60,21 @@ def parse_arguments():
         "--log-file", default=None, help="Optional path to write logs to a file."
     )
     parser.add_argument(
-        "--metrics-snapshot",
-        help="Path to write aggregated metrics when the node exits.",
+        "--metrics-dir",
+        help="directory to save periodic metrics snapshots (default: ./metrics/)",
         type=str,
+        default="./metrics",
+    )
+    parser.add_argument(
+        "--scenarios-dir",
+        help="directory to discover scenario files (default: ./scenarios, or IRONSWARM_SCENARIOS_DIR env var)",
+        type=str,
+        default=None,
+    )
+    parser.add_argument(
+        "--web-port",
+        help="port for web dashboard (default: disabled)",
+        type=int,
         default=None,
     )
 
@@ -83,12 +95,18 @@ async def async_main():
     if args.bootstrap:
         bootstrap_nodes = args.bootstrap.split(",")
 
+    # Determine scenarios directory: CLI arg > env var > default
+    scenarios_dir = args.scenarios_dir or os.getenv("IRONSWARM_SCENARIOS_DIR", "./scenarios")
+
     node = Node(
         host=args.host,
         port=args.port,
         bootstrap_nodes=bootstrap_nodes,
         job=args.job,
         output_stats=args.stats,
+        web_port=args.web_port,
+        metrics_dir=args.metrics_dir,
+        scenarios_dir=scenarios_dir,
     )
 
     await node.bind()
@@ -99,13 +117,6 @@ async def async_main():
     finally:
         await node.shutdown()
         log.info("Node shutdown gracefully.")
-        if args.metrics_snapshot:
-            snapshot_path = Path(args.metrics_snapshot)
-            if snapshot_path.parent:
-                snapshot_path.parent.mkdir(parents=True, exist_ok=True)
-            snapshot = collector.snapshot()
-            snapshot_path.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
-            log.info("Metrics snapshot written to %s", snapshot_path)
 
 
 def main():
