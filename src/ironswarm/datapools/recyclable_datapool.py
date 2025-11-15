@@ -34,7 +34,7 @@ class RecyclableDatapool(IterableDatapool):
         Example:
             checkout(8, 2) yields items at indices 8, 9, 0, 1 (wrap-around).
         """
-        if stop and stop < start:
+        if stop is not None and stop < start:
             # Wrap around: from start to end, then from beginning to stop
             first_chunk = iter(self._items[start:])
             second_chunk = iter(self._items[:stop])

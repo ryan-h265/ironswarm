@@ -34,7 +34,7 @@ class RecyclableFileDatapool(FileDatapool):
         Example:
             For lines 0..9, checkout(8, 2) yields lines 8, 9, 0, 1 (wrap-around).
         """
-        if stop and stop < start:
+        if stop is not None and stop < start:
             first_chunk =  self._extract_chunk(start, len(self))
             second_chunk =  self._extract_chunk(0, stop)
             return chain(first_chunk, second_chunk)

@@ -32,12 +32,21 @@ class FileDatapool(DatapoolBase):
         if not os.path.exists(filename):
             raise FileNotFoundError(f"{filename} doesn't exist.")
 
-        # check for metadata, create if not exists
+        # check for metadata, create if not exists or if stale
         self.meta_filename = os.path.join(
         os.path.dirname(filename), f".{os.path.basename(filename)}.meta"
         )
 
-        if not os.path.exists(self.meta_filename) or self.force_metadata_creation:
+        # Regenerate metadata if:
+        # - Metadata file doesn't exist
+        # - Force regeneration is requested
+        # - Source file was modified after metadata was created (stale metadata)
+        metadata_is_stale = (
+            os.path.exists(self.meta_filename) and
+            os.path.getmtime(filename) > os.path.getmtime(self.meta_filename)
+        )
+
+        if not os.path.exists(self.meta_filename) or self.force_metadata_creation or metadata_is_stale:
             self._process_data_file()
 
     @lru_cache
@@ -45,9 +54,12 @@ class FileDatapool(DatapoolBase):
         # Go to the last line of the meta file and extract its content
         # Seek the position on the file and iterate until the eof counting the lines
         with open(self.meta_filename) as mf:
-            for line in mf:
+            last_line = None
+            for last_line in mf:
                 pass
-            line_number, seek_point = line.strip().split(',')
+            if last_line is None:
+                return 0  # Empty file
+            line_number, seek_point = last_line.strip().split(',')
         with open(self.filename, "rb") as f:
             f.seek(int(seek_point))
             current_line_number = int(line_number)
@@ -109,11 +121,13 @@ class FileDatapool(DatapoolBase):
             f.seek(closest_seek_point)
             current_line_number = closest_line_number
             for line in f:  # type: bytes
+                # Check if we've reached the stop index before processing
+                if stop is not None and current_line_number >= stop:
+                    break
                 current_line_number += 1
                 if current_line_number > start:
-                    yield line.decode("utf-8").strip()
-                if stop and current_line_number >= stop:
-                    break
+                    # Use 'replace' to handle non-UTF-8 characters gracefully
+                    yield line.decode("utf-8", errors="replace").strip()
 
     def _seek_closest_point(self, start: int):
         """
