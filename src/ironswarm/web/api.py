@@ -853,6 +853,12 @@ async def post_parse_curl(request: web.Request) -> web.Response:
                 i += 1
                 continue
 
+            # HEAD request
+            if part in ["-I", "--head"]:
+                parsed["method"] = "HEAD"
+                i += 1
+                continue
+
             # Method
             if part in ["-X", "--request"]:
                 if i + 1 < len(parts):
