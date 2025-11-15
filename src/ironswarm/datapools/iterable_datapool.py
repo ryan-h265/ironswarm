@@ -1,5 +1,6 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from functools import lru_cache
+from typing import Any
 
 from ironswarm.datapools.base_datapool import DatapoolBase
 
@@ -30,7 +31,7 @@ class IterableDatapool(DatapoolBase):
     def __len__(self):
         return len(self._items)
 
-    def checkout(self, start: int = 0, stop: int | None = None):
+    def checkout(self, start: int = 0, stop: int | None = None) -> Iterator[Any]:
         """
         Returns an iterator over items in the datapool from index 'start' (inclusive) to 'stop' (exclusive).
 
@@ -39,7 +40,7 @@ class IterableDatapool(DatapoolBase):
             stop (int | None): The stopping index (exclusive). If None, iterate to the end.
 
         Returns:
-            Iterator: An iterator over the selected items in the datapool.
+            Iterator[Any]: An iterator over the selected items in the datapool.
 
         Example:
             checkout(2, 5) yields items at indices 2, 3, 4.

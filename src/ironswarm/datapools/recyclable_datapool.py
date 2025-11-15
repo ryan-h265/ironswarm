@@ -1,5 +1,6 @@
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from itertools import chain
+from typing import Any
 
 from ironswarm.datapools.iterable_datapool import IterableDatapool
 
@@ -15,7 +16,7 @@ class RecyclableDatapool(IterableDatapool):
         super().__init__(iterable)
         self._recyclable = True
 
-    def checkout(self, start: int = 0, stop: int | None = None):
+    def checkout(self, start: int = 0, stop: int | None = None) -> Iterator[Any]:
         """
         Returns an iterator over items in the datapool from index 'start' (inclusive) to 'stop' (exclusive),
         recycling to the beginning if stop < start.
@@ -25,7 +26,7 @@ class RecyclableDatapool(IterableDatapool):
             stop (int | None): The stopping index (exclusive). If None, iterate to the end.
 
         Returns:
-            Iterator: An iterator over the selected items in the datapool, with wrap-around if needed.
+            Iterator[Any]: An iterator over the selected items in the datapool, with wrap-around if needed.
 
         Behavior:
             - If stop < start, yields items from start to end, then from 0 to stop (wrap-around).

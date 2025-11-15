@@ -1,5 +1,5 @@
 import os
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Iterator
 from functools import lru_cache
 
 from ironswarm.datapools.base_datapool import DatapoolBase
@@ -118,7 +118,7 @@ class FileDatapool(DatapoolBase):
             self.__len__.cache_clear()
             return self.__len__()
 
-    def checkout(self, start: int = 0, stop: int | None = None):
+    def checkout(self, start: int = 0, stop: int | None = None) -> Iterator[str]:
         """
         Yields lines from the file between the specified start and stop line numbers (inclusive of start, exclusive of stop).
         Uses the metadata file for efficient seeking, minimizing reads for large files.
@@ -142,14 +142,14 @@ class FileDatapool(DatapoolBase):
         """
         return self._extract_chunk(start, stop)
 
-    def _extract_chunk(self, start: int, stop: int | None = None):
+    def _extract_chunk(self, start: int, stop: int | None = None) -> Generator[str, None, None]:
         """
         Efficiently yield lines from the file between start (inclusive) and stop (exclusive).
         Uses metadata to seek close to the start line for fast access in large files.
 
         Args:
             start (int): Line number to start reading from (inclusive, 0-based).
-            stop (int): Line number to stop reading at (exclusive). If None, reads to end.
+            stop (int | None): Line number to stop reading at (exclusive). If None, reads to end.
 
         Yields:
             str: Each line in the specified range, decoded as UTF-8 and stripped.
@@ -180,7 +180,7 @@ class FileDatapool(DatapoolBase):
                     # Use 'replace' to handle non-UTF-8 characters gracefully
                     yield line.decode("utf-8", errors="replace").strip()
 
-    def _seek_closest_point(self, start: int):
+    def _seek_closest_point(self, start: int) -> tuple[int, int]:
         """
         Finds the closest line number and byte seek point in the metadata file that is less than or equal to 'start'.
         This enables efficient seeking in large files by jumping to a known position near the desired line, then scanning forward.
@@ -189,7 +189,7 @@ class FileDatapool(DatapoolBase):
             start (int): The target line number to seek to.
 
         Returns:
-            tuple: (closest_line_number, closest_seek_point) where closest_line_number <= start.
+            tuple[int, int]: (closest_line_number, closest_seek_point) where closest_line_number <= start.
         """
         try:
             closest_line_number = 0
@@ -208,7 +208,7 @@ class FileDatapool(DatapoolBase):
             self._process_data_file()
             return 0, 0
 
-    def _process_data_file(self, buffer_size: int = 1024 * 1024):
+    def _process_data_file(self, buffer_size: int = 1024 * 1024) -> None:
         """
         Processes the file to generate a metadata file for fast line-based seeking.
 
@@ -220,7 +220,7 @@ class FileDatapool(DatapoolBase):
             buffer_size (int): Size of the buffer for reading the file. Default is 1 MB.
 
         Returns:
-            None. The function writes metadata to a `.meta` file and does not return any value.
+            None: The function writes metadata to a `.meta` file and does not return any value.
 
         Notes:
             - The interval for metadata points is chosen to balance file size and seek efficiency.

@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from itertools import chain
 
 from ironswarm.datapools.file_datapool import FileDatapool
@@ -14,7 +15,7 @@ class RecyclableFileDatapool(FileDatapool):
         super().__init__(filename)
         self._recyclable = True
 
-    def checkout(self, start: int = 0, stop: int | None = None):
+    def checkout(self, start: int = 0, stop: int | None = None) -> Iterator[str]:
         """
         Yield lines from the file between start (inclusive) and stop (exclusive), with wrap-around if stop < start.
         Uses metadata for fast seeking via _extract_chunk. Lines are 0-based.

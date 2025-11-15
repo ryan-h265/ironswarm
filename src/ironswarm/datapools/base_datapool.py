@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from functools import lru_cache
+from typing import Any
 from uuid import uuid4
 
 
@@ -59,7 +61,7 @@ class DatapoolBase(ABC):
     # Trade-off: More indirection, but enforces caching automatically
 
     @abstractmethod
-    def checkout(self, start: int = 0, stop: int | None = None):
+    def checkout(self, start: int = 0, stop: int | None = None) -> Iterator[Any]:
         """
         Returns an iterator over items in the datapool from index 'start' (inclusive) to 'stop' (exclusive).
 
@@ -72,5 +74,5 @@ class DatapoolBase(ABC):
             stop (int | None): The stopping index (exclusive). If None, iterate to the end.
 
         Returns:
-            Iterator: An iterator over the selected items in the datapool.
+            Iterator[Any]: An iterator over the selected items in the datapool.
         """
