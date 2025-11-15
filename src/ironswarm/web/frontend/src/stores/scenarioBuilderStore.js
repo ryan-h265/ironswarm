@@ -7,6 +7,7 @@ export const useScenarioBuilderStore = defineStore('scenarioBuilder', () => {
   const scenarioName = ref('my_scenario')
   const delay = ref(0)
   const journeys = ref([])
+  const globals = ref([])
   const selectedJourneyIndex = ref(null)
   const generatedCode = ref('')
   const isLoading = ref(false)
@@ -177,7 +178,8 @@ export const useScenarioBuilderStore = defineStore('scenarioBuilder', () => {
       const response = await axios.post('/api/scenario-builder/preview', {
         name: scenarioName.value,
         delay: delay.value,
-        journeys: journeys.value
+        journeys: journeys.value,
+        globals: globals.value
       })
       generatedCode.value = response.data.code
       return response.data.code
@@ -198,6 +200,7 @@ export const useScenarioBuilderStore = defineStore('scenarioBuilder', () => {
         name: scenarioName.value,
         delay: delay.value,
         journeys: journeys.value,
+        globals: globals.value,
         custom_code: customCode
       })
       generatedCode.value = response.data.code
@@ -236,6 +239,7 @@ export const useScenarioBuilderStore = defineStore('scenarioBuilder', () => {
     scenarioName.value = 'my_scenario'
     delay.value = 0
     journeys.value = []
+    globals.value = []
     selectedJourneyIndex.value = null
     generatedCode.value = ''
     error.value = null
@@ -243,6 +247,25 @@ export const useScenarioBuilderStore = defineStore('scenarioBuilder', () => {
 
   function clearError() {
     error.value = null
+  }
+
+  // Actions - Global Variables
+  function addGlobal() {
+    globals.value.push({
+      name: `var_${globals.value.length + 1}`,
+      value: '""'
+    })
+  }
+
+  function updateGlobal(index, name, value) {
+    if (globals.value[index]) {
+      globals.value[index].name = name
+      globals.value[index].value = value
+    }
+  }
+
+  function deleteGlobal(index) {
+    globals.value.splice(index, 1)
   }
 
   // Load scenario from existing file
@@ -257,6 +280,7 @@ export const useScenarioBuilderStore = defineStore('scenarioBuilder', () => {
       scenarioName.value = config.name
       delay.value = config.delay
       journeys.value = config.journeys
+      globals.value = config.globals || []
       selectedJourneyIndex.value = journeys.value.length > 0 ? 0 : null
       generatedCode.value = ''
 
@@ -275,6 +299,7 @@ export const useScenarioBuilderStore = defineStore('scenarioBuilder', () => {
     scenarioName,
     delay,
     journeys,
+    globals,
     selectedJourneyIndex,
     generatedCode,
     isLoading,
@@ -305,6 +330,10 @@ export const useScenarioBuilderStore = defineStore('scenarioBuilder', () => {
     removeDatapool,
     // Volume model
     updateVolumeModel,
+    // Global variables
+    addGlobal,
+    updateGlobal,
+    deleteGlobal,
     // Utility
     reset,
     clearError,

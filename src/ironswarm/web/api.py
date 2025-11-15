@@ -921,6 +921,7 @@ async def post_scenario_builder_save(request: web.Request) -> web.Response:
         scenario_name = config.get("name", "generated_scenario")
         delay = config.get("delay", 0)
         journeys = config.get("journeys", [])
+        globals_vars = config.get("globals", [])
 
         if not journeys:
             return json_response({
@@ -928,7 +929,7 @@ async def post_scenario_builder_save(request: web.Request) -> web.Response:
             }, status=400)
 
         # Generate Python code
-        python_code = _generate_scenario_code(scenario_name, delay, journeys)
+        python_code = _generate_scenario_code(scenario_name, delay, journeys, globals_vars)
 
         # Save to scenarios directory
         filename = f"{scenario_name}.py"
@@ -957,8 +958,9 @@ async def post_scenario_builder_preview(request: web.Request) -> web.Response:
         scenario_name = config.get("name", "generated_scenario")
         delay = config.get("delay", 0)
         journeys = config.get("journeys", [])
+        globals_vars = config.get("globals", [])
 
-        python_code = _generate_scenario_code(scenario_name, delay, journeys)
+        python_code = _generate_scenario_code(scenario_name, delay, journeys, globals_vars)
 
         return json_response({
             "code": python_code,
@@ -1014,8 +1016,34 @@ def _parse_scenario_code(code: str, scenario_name: str) -> dict:
     config = {
         "name": scenario_name,
         "delay": 0,
-        "journeys": []
+        "journeys": [],
+        "globals": []
     }
+
+    # Extract global variables (module-level assignments)
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    # Skip the scenario assignment itself
+                    if target.id == 'scenario':
+                        continue
+
+                    # Extract variable name and value
+                    var_name = target.id
+                    var_value = ""
+
+                    # Try to get the value as a string
+                    try:
+                        var_value = ast.unparse(node.value)
+                    except:
+                        if isinstance(node.value, ast.Constant):
+                            var_value = str(node.value.value)
+
+                    config["globals"].append({
+                        "name": var_name,
+                        "value": var_value
+                    })
 
     # Find journey function definitions
     journey_functions = {}
@@ -1253,7 +1281,7 @@ def _find_url_assignment(func_node, code: str) -> str:
     return ""
 
 
-def _generate_scenario_code(scenario_name: str, delay: int, journeys: list) -> str:
+def _generate_scenario_code(scenario_name: str, delay: int, journeys: list, globals_vars: list = None) -> str:
     """Generate Python code for a scenario."""
 
     # Build imports
@@ -1274,18 +1302,27 @@ def _generate_scenario_code(scenario_name: str, delay: int, journeys: list) -> s
 
     code_lines = imports + ["", ""]
 
-    # Add base URL (if any journey uses it)
-    uses_base_url = any(
-        any(req.get("url", "").startswith("http") for req in j.get("requests", []))
-        for j in journeys
-    )
+    # Add global variables
+    if globals_vars:
+        for var in globals_vars:
+            name = var.get("name", "")
+            value = var.get("value", "")
+            if name and value:
+                code_lines.append(f"{name} = {value}")
+        code_lines.extend(["", ""])
+    else:
+        # Add base URL if no globals specified (backward compatibility)
+        uses_base_url = any(
+            any(req.get("url", "").startswith("http") for req in j.get("requests", []))
+            for j in journeys
+        )
 
-    if uses_base_url:
-        code_lines.extend([
-            f'base_url = os.getenv("{scenario_name.upper()}_BASE_URL", "http://127.0.0.1:8080").rstrip("/")',
-            "",
-            ""
-        ])
+        if uses_base_url:
+            code_lines.extend([
+                f'base_url = os.getenv("{scenario_name.upper()}_BASE_URL", "http://127.0.0.1:8080").rstrip("/")',
+                "",
+                ""
+            ])
 
     # Helper function
     code_lines.extend([

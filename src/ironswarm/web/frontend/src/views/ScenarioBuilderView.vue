@@ -46,6 +46,36 @@
     <div class="builder-layout">
       <!-- Journey Sidebar -->
       <div class="journey-sidebar panel">
+        <!-- Global Variables Section -->
+        <div class="globals-section">
+          <div class="sidebar-header">
+            <h3>GLOBAL VARIABLES ({{ store.globals.length }})</h3>
+            <button @click="store.addGlobal()" class="add-btn">+ ADD</button>
+          </div>
+          <div v-if="store.globals.length > 0" class="globals-list">
+            <div
+              v-for="(global, index) in store.globals"
+              :key="index"
+              class="global-item"
+            >
+              <input
+                v-model="global.name"
+                @input="store.updateGlobal(index, global.name, global.value)"
+                placeholder="variable_name"
+                class="global-name mono"
+              />
+              <span class="equals">=</span>
+              <input
+                v-model="global.value"
+                @input="store.updateGlobal(index, global.name, global.value)"
+                placeholder="value"
+                class="global-value mono"
+              />
+              <button @click="store.deleteGlobal(index)" class="delete-btn" title="Delete">✕</button>
+            </div>
+          </div>
+        </div>
+
         <div class="sidebar-header">
           <h3>JOURNEYS ({{ store.journeys.length }})</h3>
           <button @click="store.addJourney()" class="add-btn">+ ADD</button>
@@ -637,6 +667,69 @@ async function loadExistingScenario() {
   margin: 0;
   font-size: 1rem;
   letter-spacing: 0.1em;
+}
+
+/* Global Variables Section */
+.globals-section {
+  border-bottom: 2px solid var(--border-color);
+}
+
+.globals-list {
+  padding: 0.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.global-item {
+  display: grid;
+  grid-template-columns: 1fr auto 2fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.global-item:hover {
+  border-color: var(--cyan);
+  background: rgba(0, 255, 255, 0.05);
+}
+
+.global-name,
+.global-value {
+  padding: 0.25rem 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.global-name:focus,
+.global-value:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.1);
+}
+
+.global-item .equals {
+  color: var(--amber);
+  font-weight: bold;
+}
+
+.global-item .delete-btn {
+  padding: 0.25rem 0.5rem;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.global-item .delete-btn:hover {
+  background: rgba(255, 0, 0, 0.1);
+  border-color: #ff0000;
+  color: #ff0000;
 }
 
 .journey-list {
