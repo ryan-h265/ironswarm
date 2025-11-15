@@ -111,8 +111,11 @@
           </div>
 
           <div class="datapool-actions">
+            <button @click="toggleInlinePreview(datapool.name)" class="view-btn">
+              {{ expandedPreviews.has(datapool.name) ? '▼ HIDE' : '▶ PREVIEW' }}
+            </button>
             <button @click="viewDatapool(datapool.name)" class="view-btn">
-              VIEW
+              FULL VIEW
             </button>
             <button @click="downloadDatapool(datapool.name)" class="download-btn">
               DOWNLOAD
@@ -120,6 +123,16 @@
             <button @click="confirmDelete(datapool.name)" class="danger">
               DELETE
             </button>
+          </div>
+
+          <!-- Inline Preview -->
+          <div v-if="expandedPreviews.has(datapool.name)" class="inline-preview">
+            <div class="preview-title">PREVIEW (First 5 lines):</div>
+            <div class="preview-lines mono">
+              <div v-for="(line, idx) in getPreviewLines(datapool.name).slice(0, 5)" :key="idx" class="preview-line">
+                {{ line }}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -200,6 +213,7 @@ const uploadStatus = ref(null)
 const showPreview = ref(false)
 const showDeleteConfirm = ref(false)
 const datapoolToDelete = ref(null)
+const expandedPreviews = ref(new Set())
 
 onMounted(() => {
   datapoolStore.fetchDatapools()
@@ -249,6 +263,30 @@ async function viewDatapool(name) {
 function closePreview() {
   showPreview.value = false
   datapoolStore.selectedDatapool = null
+}
+
+async function toggleInlinePreview(datapoolName) {
+  if (expandedPreviews.value.has(datapoolName)) {
+    expandedPreviews.value.delete(datapoolName)
+  } else {
+    // Fetch preview data if not already loaded
+    if (!datapoolStore.selectedDatapool || datapoolStore.selectedDatapool.name !== datapoolName) {
+      try {
+        await datapoolStore.fetchDatapool(datapoolName)
+      } catch (error) {
+        console.error('Failed to load datapool preview:', error)
+        return
+      }
+    }
+    expandedPreviews.value.add(datapoolName)
+  }
+}
+
+function getPreviewLines(datapoolName) {
+  if (datapoolStore.selectedDatapool && datapoolStore.selectedDatapool.name === datapoolName) {
+    return datapoolStore.selectedDatapool.preview || []
+  }
+  return []
 }
 
 function downloadDatapool(name) {
@@ -492,6 +530,42 @@ function formatDate(timestamp) {
 .datapool-actions button {
   flex: 1;
   min-width: 80px;
+}
+
+/* Inline Preview */
+.inline-preview {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.preview-title {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+}
+
+.preview-lines {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  padding: 0.5rem;
+  font-size: 0.875rem;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.preview-line {
+  padding: 0.125rem 0;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.preview-line:nth-child(odd) {
+  background: rgba(0, 255, 255, 0.02);
 }
 
 /* Empty/Loading States */

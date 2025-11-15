@@ -74,6 +74,12 @@
               <button @click="store.deleteGlobal(index)" class="delete-btn" title="Delete">✕</button>
             </div>
           </div>
+          <div class="global-presets">
+            <span class="presets-label">QUICK ADD:</span>
+            <button @click="store.addGlobalPreset('api_key')" class="preset-btn" title="Add API key preset">🔑 API Key</button>
+            <button @click="store.addGlobalPreset('timeout')" class="preset-btn" title="Add timeout preset">⏱️ Timeout</button>
+            <button @click="store.addGlobalPreset('max_retries')" class="preset-btn" title="Add max retries preset">🔄 Retries</button>
+          </div>
         </div>
 
         <div class="sidebar-header">
@@ -187,8 +193,25 @@
             <div class="section-header">
               <h3 class="section-title">HTTP REQUESTS ({{ store.selectedJourney.requests.length }})</h3>
               <div class="request-actions">
-                <button @click="showCurlModal = true">📋 FROM CURL</button>
+                <button @click="showInlineCurl = !showInlineCurl" :class="{ active: showInlineCurl }">
+                  {{ showInlineCurl ? '✕ CLOSE' : '📋 FROM CURL' }}
+                </button>
                 <button @click="store.addRequest()" class="add-btn">+ ADD REQUEST</button>
+              </div>
+            </div>
+
+            <!-- Inline Curl Import -->
+            <div v-if="showInlineCurl" class="inline-curl-section">
+              <input
+                v-model="inlineCurlCommand"
+                @keyup.enter="importInlineCurl"
+                placeholder="Paste curl command here and press Enter..."
+                class="inline-curl-input mono"
+                autofocus
+              />
+              <div class="inline-curl-actions">
+                <button @click="importInlineCurl" class="primary">IMPORT</button>
+                <button @click="showInlineCurl = false; inlineCurlCommand = ''">CANCEL</button>
               </div>
             </div>
 
@@ -397,7 +420,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useScenarioBuilderStore } from '../stores/scenarioBuilderStore'
 import { useDatapoolStore } from '../stores/datapoolStore'
 
@@ -407,6 +430,8 @@ const datapoolStore = useDatapoolStore()
 const showDatapoolModal = ref(false)
 const showCurlModal = ref(false)
 const showCodePreview = ref(false)
+const showInlineCurl = ref(false)
+const inlineCurlCommand = ref('')
 const expandedRequests = ref(new Set())
 const curlCommand = ref('')
 const statusMessage = ref(null)
@@ -429,7 +454,32 @@ onMounted(async () => {
   if (store.journeys.length === 0) {
     store.addJourney()
   }
+
+  // Add keyboard shortcuts
+  window.addEventListener('keydown', handleKeyboardShortcuts)
 })
+
+onUnmounted(() => {
+  // Clean up keyboard shortcuts
+  window.removeEventListener('keydown', handleKeyboardShortcuts)
+})
+
+function handleKeyboardShortcuts(event) {
+  // Cmd+S or Ctrl+S: Save
+  if ((event.metaKey || event.ctrlKey) && event.key === 's') {
+    event.preventDefault()
+    if (store.isValid) {
+      saveScenario()
+    }
+  }
+  // Cmd+P or Ctrl+P: Preview
+  if ((event.metaKey || event.ctrlKey) && event.key === 'p') {
+    event.preventDefault()
+    if (store.isValid) {
+      showPreview()
+    }
+  }
+}
 
 function toggleRequestDetails(index) {
   if (expandedRequests.value.has(index)) {
@@ -474,6 +524,21 @@ async function importCurl() {
     showStatus('Curl command imported successfully', 'success')
     curlCommand.value = ''
     showCurlModal.value = false
+  } catch (error) {
+    showStatus(`Import failed: ${error.message}`, 'error')
+  }
+}
+
+async function importInlineCurl() {
+  if (!inlineCurlCommand.value.trim()) {
+    return
+  }
+
+  try {
+    await store.addRequestFromCurl(inlineCurlCommand.value)
+    showStatus('Curl command imported successfully', 'success')
+    inlineCurlCommand.value = ''
+    showInlineCurl.value = false
   } catch (error) {
     showStatus(`Import failed: ${error.message}`, 'error')
   }
@@ -732,6 +797,39 @@ async function loadExistingScenario() {
   color: #ff0000;
 }
 
+.global-presets {
+  padding: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-color);
+}
+
+.presets-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: bold;
+  letter-spacing: 0.05em;
+}
+
+.preset-btn {
+  padding: 0.25rem 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.preset-btn:hover {
+  border-color: var(--cyan);
+  background: rgba(0, 255, 255, 0.1);
+  color: var(--cyan);
+}
+
 .journey-list {
   flex: 1;
   overflow-y: auto;
@@ -894,6 +992,36 @@ async function loadExistingScenario() {
 .request-actions {
   display: flex;
   gap: 0.5rem;
+}
+
+/* Inline Curl Import */
+.inline-curl-section {
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border: 2px solid var(--cyan);
+  margin-bottom: 1rem;
+}
+
+.inline-curl-input {
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.inline-curl-input:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.1);
+}
+
+.inline-curl-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
 }
 
 .requests-list {

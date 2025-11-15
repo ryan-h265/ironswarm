@@ -7,7 +7,12 @@ export const useScenarioBuilderStore = defineStore('scenarioBuilder', () => {
   const scenarioName = ref('my_scenario')
   const delay = ref(0)
   const journeys = ref([])
-  const globals = ref([])
+  const globals = ref([
+    {
+      name: 'base_url',
+      value: 'os.getenv("MY_SCENARIO_BASE_URL", "http://127.0.0.1:8080").rstrip("/")'
+    }
+  ])
   const selectedJourneyIndex = ref(null)
   const generatedCode = ref('')
   const isLoading = ref(false)
@@ -239,7 +244,12 @@ export const useScenarioBuilderStore = defineStore('scenarioBuilder', () => {
     scenarioName.value = 'my_scenario'
     delay.value = 0
     journeys.value = []
-    globals.value = []
+    globals.value = [
+      {
+        name: 'base_url',
+        value: 'os.getenv("MY_SCENARIO_BASE_URL", "http://127.0.0.1:8080").rstrip("/")'
+      }
+    ]
     selectedJourneyIndex.value = null
     generatedCode.value = ''
     error.value = null
@@ -266,6 +276,35 @@ export const useScenarioBuilderStore = defineStore('scenarioBuilder', () => {
 
   function deleteGlobal(index) {
     globals.value.splice(index, 1)
+  }
+
+  function addGlobalPreset(presetName) {
+    const presets = {
+      base_url: {
+        name: 'base_url',
+        value: 'os.getenv("MY_SCENARIO_BASE_URL", "http://127.0.0.1:8080").rstrip("/")'
+      },
+      api_key: {
+        name: 'api_key',
+        value: 'os.getenv("API_KEY", "")'
+      },
+      timeout: {
+        name: 'timeout',
+        value: '30'
+      },
+      max_retries: {
+        name: 'max_retries',
+        value: '3'
+      }
+    }
+
+    if (presets[presetName]) {
+      // Check if this preset already exists
+      const exists = globals.value.some(g => g.name === presets[presetName].name)
+      if (!exists) {
+        globals.value.push(presets[presetName])
+      }
+    }
   }
 
   // Load scenario from existing file
@@ -334,6 +373,7 @@ export const useScenarioBuilderStore = defineStore('scenarioBuilder', () => {
     addGlobal,
     updateGlobal,
     deleteGlobal,
+    addGlobalPreset,
     // Utility
     reset,
     clearError,
