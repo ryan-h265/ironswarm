@@ -6,6 +6,7 @@ process. The collector keeps Prometheus-compatible counter and histogram
 structures so future exporters can reuse the same data without refactors.
 """
 
+from . import aggregator
 from .collector import (
     DEFAULT_LATENCY_BUCKETS,
     CounterMetric,
@@ -27,4 +28,5 @@ __all__ = [
     "generate_graphs",
     "collector",
     "get_collector",
+    "aggregator",
 ]
