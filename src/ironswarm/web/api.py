@@ -971,6 +971,288 @@ async def post_scenario_builder_preview(request: web.Request) -> web.Response:
         }, status=400)
 
 
+async def get_scenario_builder_load(request: web.Request) -> web.Response:
+    """Load and parse an existing scenario file for editing."""
+    node = request.app["node"]
+    scenario_name = request.match_info["scenario_name"]
+
+    try:
+        # Remove .py extension if provided
+        if scenario_name.endswith(".py"):
+            scenario_name = scenario_name[:-3]
+
+        file_path = node.scenarios_dir / f"{scenario_name}.py"
+
+        if not file_path.exists():
+            return json_response({
+                "error": f"Scenario '{scenario_name}' not found",
+            }, status=404)
+
+        # Read and parse the file
+        code = file_path.read_text()
+        parsed_config = _parse_scenario_code(code, scenario_name)
+
+        return json_response(parsed_config)
+
+    except Exception as e:
+        logger.error(f"Failed to load scenario: {e}", exc_info=True)
+        return json_response({
+            "error": str(e),
+        }, status=500)
+
+
+def _parse_scenario_code(code: str, scenario_name: str) -> dict:
+    """Parse a scenario Python file and extract configuration."""
+    import ast
+    import re
+
+    try:
+        tree = ast.parse(code)
+    except SyntaxError as e:
+        raise ValueError(f"Invalid Python syntax: {e}")
+
+    config = {
+        "name": scenario_name,
+        "delay": 0,
+        "journeys": []
+    }
+
+    # Find journey function definitions
+    journey_functions = {}
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            # Check if it has @http_session decorator
+            has_decorator = any(
+                (isinstance(d, ast.Name) and d.id == 'http_session') or
+                (isinstance(d, ast.Call) and isinstance(d.func, ast.Name) and d.func.id == 'http_session')
+                for d in node.decorator_list
+            )
+            if has_decorator:
+                journey_functions[node.name] = node
+
+    # Find scenario definition
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == 'scenario':
+                    if isinstance(node.value, ast.Call):
+                        # Extract delay
+                        for keyword in node.value.keywords:
+                            if keyword.arg == 'delay':
+                                if isinstance(keyword.value, ast.Constant):
+                                    config["delay"] = keyword.value.value
+
+                        # Extract journeys
+                        for keyword in node.value.keywords:
+                            if keyword.arg == 'journeys':
+                                if isinstance(keyword.value, ast.List):
+                                    for journey_node in keyword.value.elts:
+                                        if isinstance(journey_node, ast.Call):
+                                            journey_config = _parse_journey_call(journey_node, journey_functions, code)
+                                            if journey_config:
+                                                config["journeys"].append(journey_config)
+
+    return config
+
+
+def _parse_journey_call(journey_call: ast.Call, journey_functions: dict, code: str) -> dict:
+    """Parse a Journey() call from AST."""
+    import ast
+
+    journey_config = {
+        "name": "unnamed_journey",
+        "requests": [],
+        "datapool": None,
+        "volumeModel": {"target": 10, "duration": 60}
+    }
+
+    # Extract spec (can be positional or keyword argument)
+    spec_node = None
+    if len(journey_call.args) >= 1:
+        spec_node = journey_call.args[0]
+    else:
+        # Check for spec keyword argument
+        for keyword in journey_call.keywords:
+            if keyword.arg == 'spec':
+                spec_node = keyword.value
+                break
+
+    # Extract journey name from spec
+    if spec_node:
+        if isinstance(spec_node, ast.Constant):
+            # String spec like "scenarios.my_scenario:journey_name"
+            spec = spec_node.value
+            if ':' in spec:
+                journey_config["name"] = spec.split(':')[-1]
+        elif isinstance(spec_node, ast.Name):
+            # Function reference like get_users
+            journey_config["name"] = spec_node.id
+
+    # Extract datapool (positional or keyword)
+    datapool_node = None
+    if len(journey_call.args) >= 2:
+        datapool_node = journey_call.args[1]
+    else:
+        for keyword in journey_call.keywords:
+            if keyword.arg == 'datapool':
+                datapool_node = keyword.value
+                break
+
+    if datapool_node and not (isinstance(datapool_node, ast.Constant) and datapool_node.value is None):
+        datapool_config = _parse_datapool_node(datapool_node)
+        if datapool_config:
+            journey_config["datapool"] = datapool_config
+
+    # Extract volume model (positional or keyword)
+    vm_node = None
+    if len(journey_call.args) >= 3:
+        vm_node = journey_call.args[2]
+    else:
+        for keyword in journey_call.keywords:
+            if keyword.arg == 'volume_model':
+                vm_node = keyword.value
+                break
+
+    if vm_node and isinstance(vm_node, ast.Call):
+        for keyword in vm_node.keywords:
+            if keyword.arg == 'target' and isinstance(keyword.value, ast.Constant):
+                journey_config["volumeModel"]["target"] = keyword.value.value
+            if keyword.arg == 'duration' and isinstance(keyword.value, ast.Constant):
+                journey_config["volumeModel"]["duration"] = keyword.value.value
+
+    # Parse journey function body to extract HTTP requests
+    journey_name = journey_config["name"]
+    if journey_name in journey_functions:
+        func_node = journey_functions[journey_name]
+        requests = _parse_journey_function(func_node, code)
+        journey_config["requests"] = requests
+
+    return journey_config
+
+
+def _parse_datapool_node(node) -> dict:
+    """Parse a datapool constructor call from AST."""
+    import ast
+
+    if isinstance(node, ast.Call):
+        if isinstance(node.func, ast.Name):
+            datapool_type = node.func.id
+            source = ""
+
+            # Get source argument
+            if len(node.args) >= 1:
+                if isinstance(node.args[0], ast.Constant):
+                    source = str(node.args[0].value)
+                else:
+                    # For complex expressions, use ast.unparse if available
+                    try:
+                        source = ast.unparse(node.args[0])
+                    except:
+                        source = str(node.args[0])
+
+            return {
+                "type": datapool_type,
+                "source": source
+            }
+
+    return None
+
+
+def _parse_journey_function(func_node, code: str) -> list:
+    """Parse journey function body to extract HTTP requests."""
+    import ast
+    import re
+
+    requests = []
+
+    # Look for context.session.METHOD(url, ...) patterns in the function
+    for node in ast.walk(func_node):
+        if isinstance(node, ast.AsyncWith):
+            for item in node.items:
+                if isinstance(item.context_expr, ast.Call):
+                    call = item.context_expr
+                    # Check if it's context.session.method(...)
+                    if isinstance(call.func, ast.Attribute):
+                        if isinstance(call.func.value, ast.Attribute):
+                            if (isinstance(call.func.value.value, ast.Name) and
+                                call.func.value.value.id == 'context' and
+                                call.func.value.attr == 'session'):
+
+                                method = call.func.attr.upper()
+                                request = {
+                                    "method": method,
+                                    "url": "",
+                                    "headers": {},
+                                    "body": "",
+                                    "query_params": {}
+                                }
+
+                                # Extract URL (first positional arg or url= keyword)
+                                if len(call.args) >= 1:
+                                    if isinstance(call.args[0], ast.Name) and call.args[0].id == 'url':
+                                        # URL is a variable, try to find its assignment
+                                        request["url"] = _find_url_assignment(func_node, code)
+                                    elif isinstance(call.args[0], ast.Constant):
+                                        request["url"] = call.args[0].value
+                                    elif isinstance(call.args[0], ast.JoinedStr):
+                                        # f-string URL
+                                        try:
+                                            request["url"] = ast.unparse(call.args[0])
+                                        except:
+                                            request["url"] = ""
+
+                                # Extract headers from headers= keyword
+                                for keyword in call.keywords:
+                                    if keyword.arg == 'headers':
+                                        if isinstance(keyword.value, ast.Dict):
+                                            for k, v in zip(keyword.value.keys, keyword.value.values):
+                                                if isinstance(k, ast.Constant) and isinstance(v, ast.Constant):
+                                                    request["headers"][k.value] = v.value
+
+                                    # Extract query params
+                                    if keyword.arg == 'params':
+                                        if isinstance(keyword.value, ast.Dict):
+                                            for k, v in zip(keyword.value.keys, keyword.value.values):
+                                                if isinstance(k, ast.Constant) and isinstance(v, ast.Constant):
+                                                    request["query_params"][k.value] = v.value
+
+                                    # Extract JSON body
+                                    if keyword.arg == 'json':
+                                        try:
+                                            request["body"] = ast.unparse(keyword.value)
+                                        except:
+                                            pass
+
+                                    # Extract data body
+                                    if keyword.arg == 'data':
+                                        if isinstance(keyword.value, ast.Constant):
+                                            request["body"] = keyword.value.value
+
+                                requests.append(request)
+
+    return requests
+
+
+def _find_url_assignment(func_node, code: str) -> str:
+    """Find url variable assignment in function body."""
+    import ast
+
+    for node in ast.walk(func_node):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name) and target.id == 'url':
+                    if isinstance(node.value, ast.Constant):
+                        return node.value.value
+                    elif isinstance(node.value, ast.JoinedStr):
+                        # f-string - extract the base URL if possible
+                        try:
+                            return ast.unparse(node.value)
+                        except:
+                            pass
+
+    return ""
+
+
 def _generate_scenario_code(scenario_name: str, delay: int, journeys: list) -> str:
     """Generate Python code for a scenario."""
 
@@ -1196,3 +1478,4 @@ def setup_api_routes(app: web.Application, node, ws_manager):
     app.router.add_post("/api/scenario-builder/parse-curl", post_parse_curl)
     app.router.add_post("/api/scenario-builder/save", post_scenario_builder_save)
     app.router.add_post("/api/scenario-builder/preview", post_scenario_builder_preview)
+    app.router.add_get("/api/scenario-builder/load/{scenario_name}", get_scenario_builder_load)

@@ -22,6 +22,20 @@
         </div>
       </div>
       <div class="header-actions">
+        <select
+          v-model="selectedScenarioToLoad"
+          @change="loadExistingScenario"
+          class="load-scenario-select mono"
+        >
+          <option value="">Load Existing Scenario...</option>
+          <option
+            v-for="scenario in availableScenarios"
+            :key="scenario.name"
+            :value="scenario.name"
+          >
+            {{ scenario.name }}
+          </option>
+        </select>
         <button @click="showPreview" :disabled="!store.isValid">PREVIEW CODE</button>
         <button @click="saveScenario" :disabled="!store.isValid" class="primary">SAVE SCENARIO</button>
         <button @click="resetBuilder" class="danger">RESET</button>
@@ -366,15 +380,20 @@ const showCodePreview = ref(false)
 const expandedRequests = ref(new Set())
 const curlCommand = ref('')
 const statusMessage = ref(null)
+const availableScenarios = ref([])
+const selectedScenarioToLoad = ref('')
 
 const datapoolForm = ref({
   type: 'RecyclableDatapool',
   source: ''
 })
 
-onMounted(() => {
+onMounted(async () => {
   // Load available datapools
   datapoolStore.fetchDatapools()
+
+  // Load available scenarios
+  await fetchAvailableScenarios()
 
   // Initialize with one journey if empty
   if (store.journeys.length === 0) {
@@ -477,6 +496,30 @@ function showStatus(text, type = 'success') {
     statusMessage.value = null
   }, 3000)
 }
+
+async function fetchAvailableScenarios() {
+  try {
+    const response = await fetch('/api/scenarios/available')
+    const data = await response.json()
+    availableScenarios.value = data.scenarios || []
+  } catch (error) {
+    console.error('Failed to fetch available scenarios:', error)
+  }
+}
+
+async function loadExistingScenario() {
+  if (!selectedScenarioToLoad.value) {
+    return
+  }
+
+  try {
+    await store.loadScenario(selectedScenarioToLoad.value)
+    showStatus(`Loaded scenario: ${selectedScenarioToLoad.value}`, 'success')
+    selectedScenarioToLoad.value = ''
+  } catch (error) {
+    showStatus(`Failed to load scenario: ${error.message}`, 'error')
+  }
+}
 </script>
 
 <style scoped>
@@ -542,6 +585,28 @@ function showStatus(text, type = 'success') {
 .header-actions {
   display: flex;
   gap: 1rem;
+}
+
+.load-scenario-select {
+  padding: 0.5rem 1rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.load-scenario-select:hover {
+  border-color: var(--color-cyan);
+  background: rgba(0, 255, 255, 0.05);
+}
+
+.load-scenario-select:focus {
+  outline: none;
+  border-color: var(--color-cyan);
+  box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.1);
 }
 
 /* Main Layout */

@@ -245,11 +245,29 @@ export const useScenarioBuilderStore = defineStore('scenarioBuilder', () => {
     error.value = null
   }
 
-  // Load scenario from existing file (to be implemented when needed)
-  async function loadScenario(scenarioFile) {
-    // This would parse an existing Python scenario file
-    // For now, it's a placeholder
-    console.log('Load scenario:', scenarioFile)
+  // Load scenario from existing file
+  async function loadScenario(scenarioNameToLoad) {
+    isLoading.value = true
+    error.value = null
+    try {
+      const response = await axios.get(`/api/scenario-builder/load/${encodeURIComponent(scenarioNameToLoad)}`)
+      const config = response.data
+
+      // Populate builder state
+      scenarioName.value = config.name
+      delay.value = config.delay
+      journeys.value = config.journeys
+      selectedJourneyIndex.value = journeys.value.length > 0 ? 0 : null
+      generatedCode.value = ''
+
+      return config
+    } catch (err) {
+      console.error('Failed to load scenario:', err)
+      error.value = err.response?.data?.error || 'Failed to load scenario'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
   }
 
   return {
