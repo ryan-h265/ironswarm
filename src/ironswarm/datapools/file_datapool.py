@@ -1,5 +1,5 @@
 import os
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Iterator
 from functools import lru_cache
 
 from ironswarm.datapools.base_datapool import DatapoolBase
@@ -32,30 +32,93 @@ class FileDatapool(DatapoolBase):
         if not os.path.exists(filename):
             raise FileNotFoundError(f"{filename} doesn't exist.")
 
-        # check for metadata, create if not exists
+        # check for metadata, create if not exists or if stale
         self.meta_filename = os.path.join(
         os.path.dirname(filename), f".{os.path.basename(filename)}.meta"
         )
 
-        if not os.path.exists(self.meta_filename) or self.force_metadata_creation:
+        # Regenerate metadata if:
+        # - Metadata file doesn't exist
+        # - Force regeneration is requested
+        # - Source file was modified after metadata was created (stale metadata)
+        # - Metadata file is corrupted
+        metadata_is_stale = (
+            os.path.exists(self.meta_filename) and
+            os.path.getmtime(filename) > os.path.getmtime(self.meta_filename)
+        )
+
+        metadata_is_corrupted = (
+            os.path.exists(self.meta_filename) and
+            not self._validate_metadata()
+        )
+
+        if not os.path.exists(self.meta_filename) or self.force_metadata_creation or metadata_is_stale or metadata_is_corrupted:
             self._process_data_file()
+
+    def _validate_metadata(self) -> bool:
+        """
+        Validates that the metadata file is well-formed and contains valid data.
+
+        Returns:
+            bool: True if metadata is valid, False if corrupted or malformed.
+
+        Checks performed:
+            - File is not empty
+            - Each line has exactly 2 comma-separated values
+            - Both values are valid integers
+            - Line numbers and seek points are non-negative
+        """
+        try:
+            with open(self.meta_filename) as mf:
+                has_content = False
+                for line in mf:
+                    has_content = True
+                    line = line.strip()
+                    if not line:
+                        continue  # Skip empty lines
+
+                    parts = line.split(',')
+                    if len(parts) != 2:
+                        return False  # Invalid format
+
+                    line_number, seek_point = parts
+                    # Validate both are integers and non-negative
+                    if not line_number.isdigit() or not seek_point.isdigit():
+                        return False
+
+                    if int(line_number) < 0 or int(seek_point) < 0:
+                        return False
+
+                return has_content  # Must have at least one valid line
+        except (OSError, IOError):
+            return False  # Can't read file = invalid
 
     @lru_cache
     def __len__(self):
         # Go to the last line of the meta file and extract its content
         # Seek the position on the file and iterate until the eof counting the lines
-        with open(self.meta_filename) as mf:
-            for line in mf:
-                pass
-            line_number, seek_point = line.strip().split(',')
-        with open(self.filename, "rb") as f:
-            f.seek(int(seek_point))
-            current_line_number = int(line_number)
-            for _ in f:  # type: bytes
-                current_line_number += 1
-        return current_line_number
+        try:
+            with open(self.meta_filename) as mf:
+                last_line = None
+                for last_line in mf:
+                    pass
+                if last_line is None:
+                    return 0  # Empty file
+                line_number, seek_point = last_line.strip().split(',')
+            with open(self.filename, "rb") as f:
+                f.seek(int(seek_point))
+                current_line_number = int(line_number)
+                for _ in f:  # type: bytes
+                    current_line_number += 1
+            return current_line_number
+        except (ValueError, OSError, IOError) as e:
+            # Metadata is corrupted or inaccessible, regenerate it
+            self._process_data_file()
+            # Clear the cache and retry
+            self.__len__.cache_clear()
+            return self.__len__()
 
-    def checkout(self, start: int = 0, stop: int | None = None):
+    def checkout(self, start: int = 0, stop: int | None = None) -> Iterator[str]:
         """
         Yields lines from the file between the specified start and stop line numbers (inclusive of start, exclusive of stop).
         Uses the metadata file for efficient seeking, minimizing reads for large files.
@@ -67,9 +130,11 @@ class FileDatapool(DatapoolBase):
         Yields:
             str: Each line in the file within the specified range, decoded as UTF-8 and stripped of whitespace.
 
+        Raises:
+            ValueError: If start is negative, start exceeds datapool length, stop is negative,
+                       or stop < start for non-recyclable datapool.
+
         Behavior:
-            - If 'start' is beyond the end of the file, yields nothing.
-            - If 'stop' is less than or equal to 'start', yields nothing.
             - Lines are counted starting from 0.
             - Uses the metadata file for fast seeking; assumes the metadata file exists (created in __init__).
             - Efficient for large files: does not load the entire file into memory.
@@ -77,16 +142,35 @@ class FileDatapool(DatapoolBase):
         Example:
             For a file with lines 0..9, checkout(2, 5) yields lines 2, 3, 4.
         """
+        # Validate start index
+        if start < 0:
+            raise ValueError(f"start must be non-negative, got {start}")
+
+        if start > len(self):
+            raise ValueError(f"start index {start} exceeds datapool length {len(self)}")
+
+        # Validate stop index if provided
+        if stop is not None:
+            if stop < 0:
+                raise ValueError(f"stop must be non-negative, got {stop}")
+
+            # For non-recyclable datapool, stop must be >= start
+            if not self._recyclable and stop < start:
+                raise ValueError(
+                    f"stop ({stop}) must be >= start ({start}) for non-recyclable datapool. "
+                    f"Use RecyclableFileDatapool if you need wrap-around behavior."
+                )
+
         return self._extract_chunk(start, stop)
 
-    def _extract_chunk(self, start: int, stop: int | None = None):
+    def _extract_chunk(self, start: int, stop: int | None = None) -> Generator[str, None, None]:
         """
         Efficiently yield lines from the file between start (inclusive) and stop (exclusive).
         Uses metadata to seek close to the start line for fast access in large files.
 
         Args:
             start (int): Line number to start reading from (inclusive, 0-based).
-            stop (int): Line number to stop reading at (exclusive). If None, reads to end.
+            stop (int | None): Line number to stop reading at (exclusive). If None, reads to end.
 
         Yields:
             str: Each line in the specified range, decoded as UTF-8 and stripped.
@@ -109,13 +193,15 @@ class FileDatapool(DatapoolBase):
             f.seek(closest_seek_point)
             current_line_number = closest_line_number
             for line in f:  # type: bytes
+                # Check if we've reached the stop index before processing
+                if stop is not None and current_line_number >= stop:
+                    break
                 current_line_number += 1
                 if current_line_number > start:
-                    yield line.decode("utf-8").strip()
-                if stop and current_line_number >= stop:
-                    break
+                    # Use 'replace' to handle non-UTF-8 characters gracefully
+                    yield line.decode("utf-8", errors="replace").strip()
 
-    def _seek_closest_point(self, start: int):
+    def _seek_closest_point(self, start: int) -> tuple[int, int]:
         """
         Finds the closest line number and byte seek point in the metadata file that is less than or equal to 'start'.
         This enables efficient seeking in large files by jumping to a known position near the desired line, then scanning forward.
@@ -124,21 +210,26 @@ class FileDatapool(DatapoolBase):
             start (int): The target line number to seek to.
 
         Returns:
-            tuple: (closest_line_number, closest_seek_point) where closest_line_number <= start.
+            tuple[int, int]: (closest_line_number, closest_seek_point) where closest_line_number <= start.
         """
-        closest_line_number = 0
-        closest_seek_point = 0
-        with open(self.meta_filename) as mf:
-            for meta_line in mf:
-                line_number, seek_point = map(int, meta_line.strip().split(","))
-                if line_number <= start:
-                    closest_line_number = line_number
-                    closest_seek_point = seek_point
-                else:
-                    break
-        return closest_line_number, closest_seek_point
+        try:
+            closest_line_number = 0
+            closest_seek_point = 0
+            with open(self.meta_filename) as mf:
+                for meta_line in mf:
+                    line_number, seek_point = map(int, meta_line.strip().split(","))
+                    if line_number <= start:
+                        closest_line_number = line_number
+                        closest_seek_point = seek_point
+                    else:
+                        break
+            return closest_line_number, closest_seek_point
+        except (ValueError, OSError, IOError) as e:
+            # Metadata is corrupted, regenerate it and return start from beginning
+            self._process_data_file()
+            return 0, 0
 
-    def _process_data_file(self, buffer_size: int = 1024 * 1024):
+    def _process_data_file(self, buffer_size: int = 1024 * 1024) -> None:
         """
         Processes the file to generate a metadata file for fast line-based seeking.
 
@@ -150,7 +241,7 @@ class FileDatapool(DatapoolBase):
             buffer_size (int): Size of the buffer for reading the file. Default is 1 MB.
 
         Returns:
-            None. The function writes metadata to a `.meta` file and does not return any value.
+            None: The function writes metadata to a `.meta` file and does not return any value.
 
         Notes:
             - The interval for metadata points is chosen to balance file size and seek efficiency.
