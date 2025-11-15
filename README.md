@@ -14,6 +14,14 @@
 
 -----
 
+<p align="center">
+  <img src="example_metrics_graphs/latency.png" alt="Latency Graph" width="45%" />
+  <img src="example_metrics_graphs/throughput.png" alt="Throughput Graph" width="45%" />
+  <img src="example_metrics_graphs/errors.png" alt="Throughput Graph" width="45%" />
+</p>
+
+
+
 ## Table of Contents
 
 - [Installation](#installation)
@@ -32,18 +40,23 @@ pip install ironswarm
 ## Usage
 
 ```
-usage: ironswarm [-h] [-b BOOTSTRAP] [-H HOST] [-p PORT] [-j JOB] [-v | --verbose | --no-verbose] [--log-file LOG_FILE]
+usage: ironswarm [-h] [-b BOOTSTRAP] [-H HOST] [-p PORT] [-j JOB] [-v | --verbose | --no-verbose] [-s | --stats | --no-stats] [--log-file LOG_FILE]
+                 [--metrics-snapshot METRICS_SNAPSHOT]
 
 options:
   -h, --help            show this help message and exit
-  -b, --bootstrap BOOTSTRAP
+  -b BOOTSTRAP, --bootstrap BOOTSTRAP
                         bootstrap node(s) to initially connect to
-  -H, --host HOST       network interface to bind to local/public or IP address (default: public)
-  -p, --port PORT       port to bind to (default: 42042)
-  -j, --job JOB         job to run (default: None)
+  -H HOST, --host HOST  network interface to bind to local/public or IP address (default: public)
+  -p PORT, --port PORT  port to bind to (default: 42042)
+  -j JOB, --job JOB     job to run (default: None)
   -v, --verbose, --no-verbose
                         enable verbose logging
+  -s, --stats, --no-stats
+                        enable stats output
   --log-file LOG_FILE   Optional path to write logs to a file.
+  --metrics-snapshot METRICS_SNAPSHOT
+                        Path to write aggregated metrics when the node exits.
 ```
 
 
