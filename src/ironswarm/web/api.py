@@ -577,6 +577,248 @@ async def get_metrics_node(request: web.Request) -> web.Response:
     })
 
 
+async def get_datapools(request: web.Request) -> web.Response:
+    """Get list of all uploaded datapools."""
+    node = request.app["node"]
+
+    try:
+        # Get datapools directory
+        datapools_dir = node.scenarios_dir.parent / "datapools"
+
+        if not datapools_dir.exists():
+            return json_response({
+                "datapools": [],
+                "datapools_dir": str(datapools_dir),
+                "timestamp": datetime.now().isoformat(),
+            })
+
+        # List all datapool files (excluding metadata files)
+        datapools = []
+        for file_path in datapools_dir.iterdir():
+            if file_path.is_file() and not file_path.name.startswith('.'):
+                # Get file stats
+                stats = file_path.stat()
+
+                # Count lines in file
+                try:
+                    with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                        line_count = sum(1 for _ in f)
+                except Exception:
+                    line_count = 0
+
+                # Check if metadata file exists
+                meta_file = datapools_dir / f".{file_path.name}.meta"
+                has_metadata = meta_file.exists()
+
+                datapools.append({
+                    "name": file_path.name,
+                    "size": stats.st_size,
+                    "line_count": line_count,
+                    "created": stats.st_ctime,
+                    "modified": stats.st_mtime,
+                    "has_metadata": has_metadata,
+                })
+
+        # Sort by modified time (most recent first)
+        datapools.sort(key=lambda x: x["modified"], reverse=True)
+
+        return json_response({
+            "datapools": datapools,
+            "datapools_dir": str(datapools_dir),
+            "timestamp": datetime.now().isoformat(),
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to list datapools: {e}")
+        return json_response({
+            "error": str(e),
+        }, status=500)
+
+
+async def post_datapool_upload(request: web.Request) -> web.Response:
+    """Upload a new datapool file."""
+    node = request.app["node"]
+
+    try:
+        # Get the uploaded file
+        reader = await request.multipart()
+        file_field = await reader.next()
+
+        if file_field is None:
+            return json_response({
+                "error": "No file uploaded",
+            }, status=400)
+
+        # Validate it's a file field
+        if file_field.name != "file":
+            return json_response({
+                "error": "Expected file field named 'file'",
+            }, status=400)
+
+        filename = file_field.filename
+        if not filename:
+            return json_response({
+                "error": "Filename is required",
+            }, status=400)
+
+        # Read file content
+        file_content = await file_field.read()
+
+        # Create datapools directory if it doesn't exist
+        datapools_dir = node.scenarios_dir.parent / "datapools"
+        datapools_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save file
+        file_path = datapools_dir / filename
+        file_path.write_bytes(file_content)
+
+        # Get file stats
+        stats = file_path.stat()
+
+        # Count lines in file
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                line_count = sum(1 for _ in f)
+        except Exception:
+            line_count = 0
+
+        return json_response({
+            "status": "uploaded",
+            "name": filename,
+            "size": stats.st_size,
+            "line_count": line_count,
+            "timestamp": datetime.now().isoformat(),
+        }, status=201)
+
+    except Exception as e:
+        logger.error(f"Failed to upload datapool: {e}", exc_info=True)
+        return json_response({
+            "error": str(e),
+        }, status=500)
+
+
+async def get_datapool(request: web.Request) -> web.Response:
+    """Get information about a specific datapool."""
+    node = request.app["node"]
+    datapool_name = request.match_info["datapool_name"]
+
+    try:
+        datapools_dir = node.scenarios_dir.parent / "datapools"
+        file_path = datapools_dir / datapool_name
+
+        if not file_path.exists() or not file_path.is_file():
+            return json_response({
+                "error": f"Datapool '{datapool_name}' not found",
+            }, status=404)
+
+        # Get file stats
+        stats = file_path.stat()
+
+        # Count lines in file
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                line_count = sum(1 for _ in f)
+        except Exception:
+            line_count = 0
+
+        # Check if metadata file exists
+        meta_file = datapools_dir / f".{datapool_name}.meta"
+        has_metadata = meta_file.exists()
+
+        # Get preview (first 10 lines)
+        preview_lines = []
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+                for i, line in enumerate(f):
+                    if i >= 10:
+                        break
+                    preview_lines.append(line.rstrip('\n\r'))
+        except Exception:
+            pass
+
+        return json_response({
+            "name": datapool_name,
+            "size": stats.st_size,
+            "line_count": line_count,
+            "created": stats.st_ctime,
+            "modified": stats.st_mtime,
+            "has_metadata": has_metadata,
+            "preview": preview_lines,
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to get datapool info: {e}")
+        return json_response({
+            "error": str(e),
+        }, status=500)
+
+
+async def download_datapool(request: web.Request) -> web.Response:
+    """Download a datapool file."""
+    node = request.app["node"]
+    datapool_name = request.match_info["datapool_name"]
+
+    try:
+        datapools_dir = node.scenarios_dir.parent / "datapools"
+        file_path = datapools_dir / datapool_name
+
+        if not file_path.exists() or not file_path.is_file():
+            return json_response({
+                "error": f"Datapool '{datapool_name}' not found",
+            }, status=404)
+
+        # Read file content
+        file_content = file_path.read_bytes()
+
+        return web.Response(
+            body=file_content,
+            content_type="application/octet-stream",
+            headers={
+                "Content-Disposition": f'attachment; filename="{datapool_name}"'
+            },
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to download datapool: {e}")
+        return json_response({
+            "error": str(e),
+        }, status=500)
+
+
+async def delete_datapool(request: web.Request) -> web.Response:
+    """Delete a datapool file."""
+    node = request.app["node"]
+    datapool_name = request.match_info["datapool_name"]
+
+    try:
+        datapools_dir = node.scenarios_dir.parent / "datapools"
+        file_path = datapools_dir / datapool_name
+
+        if not file_path.exists() or not file_path.is_file():
+            return json_response({
+                "error": f"Datapool '{datapool_name}' not found",
+            }, status=404)
+
+        # Delete the file
+        file_path.unlink()
+
+        # Also delete metadata file if it exists
+        meta_file = datapools_dir / f".{datapool_name}.meta"
+        if meta_file.exists():
+            meta_file.unlink()
+
+        return json_response({
+            "status": "deleted",
+            "name": datapool_name,
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to delete datapool: {e}")
+        return json_response({
+            "error": str(e),
+        }, status=500)
+
+
 async def get_debug_state(request: web.Request) -> web.Response:
     """Debug endpoint to view raw node state."""
     node = request.app["node"]
@@ -654,3 +896,9 @@ def setup_api_routes(app: web.Application, node, ws_manager):
     app.router.add_get("/api/export/report", get_export_report)
     app.router.add_get("/api/export/graphs", get_export_graphs)
     app.router.add_get("/api/debug/state", get_debug_state)
+    # Datapool routes
+    app.router.add_get("/api/datapools", get_datapools)
+    app.router.add_post("/api/datapools/upload", post_datapool_upload)
+    app.router.add_get("/api/datapools/{datapool_name}", get_datapool)
+    app.router.add_get("/api/datapools/{datapool_name}/download", download_datapool)
+    app.router.add_delete("/api/datapools/{datapool_name}", delete_datapool)

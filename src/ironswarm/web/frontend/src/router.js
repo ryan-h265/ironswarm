@@ -31,6 +31,11 @@ const routes = [
     name: 'Reports',
     component: () => import('./views/ReportsView.vue'),
   },
+  {
+    path: '/datapools',
+    name: 'Datapools',
+    component: () => import('./views/DatapoolView.vue'),
+  },
 ]
 
 const router = createRouter({
