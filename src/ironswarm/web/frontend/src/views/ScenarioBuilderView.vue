@@ -74,12 +74,6 @@
               <button @click="store.deleteGlobal(index)" class="delete-btn" title="Delete">✕</button>
             </div>
           </div>
-          <div class="global-presets">
-            <span class="presets-label">QUICK ADD:</span>
-            <button @click="store.addGlobalPreset('api_key')" class="preset-btn" title="Add API key preset">🔑 API Key</button>
-            <button @click="store.addGlobalPreset('timeout')" class="preset-btn" title="Add timeout preset">⏱️ Timeout</button>
-            <button @click="store.addGlobalPreset('max_retries')" class="preset-btn" title="Add max retries preset">🔄 Retries</button>
-          </div>
         </div>
 
         <div class="sidebar-header">
@@ -795,39 +789,6 @@ async function loadExistingScenario() {
   background: rgba(255, 0, 0, 0.1);
   border-color: #ff0000;
   color: #ff0000;
-}
-
-.global-presets {
-  padding: 0.5rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border-color);
-}
-
-.presets-label {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  font-weight: bold;
-  letter-spacing: 0.05em;
-}
-
-.preset-btn {
-  padding: 0.25rem 0.5rem;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.preset-btn:hover {
-  border-color: var(--cyan);
-  background: rgba(0, 255, 255, 0.1);
-  color: var(--cyan);
 }
 
 .journey-list {
