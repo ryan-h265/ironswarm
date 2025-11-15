@@ -42,7 +42,30 @@ class IterableDatapool(DatapoolBase):
         Returns:
             Iterator[Any]: An iterator over the selected items in the datapool.
 
+        Raises:
+            ValueError: If start is negative, start exceeds datapool length, stop is negative,
+                       or stop < start for non-recyclable datapool.
+
         Example:
             checkout(2, 5) yields items at indices 2, 3, 4.
         """
+        # Validate start index
+        if start < 0:
+            raise ValueError(f"start must be non-negative, got {start}")
+
+        if start > len(self):
+            raise ValueError(f"start index {start} exceeds datapool length {len(self)}")
+
+        # Validate stop index if provided
+        if stop is not None:
+            if stop < 0:
+                raise ValueError(f"stop must be non-negative, got {stop}")
+
+            # For non-recyclable datapool, stop must be >= start
+            if not self._recyclable and stop < start:
+                raise ValueError(
+                    f"stop ({stop}) must be >= start ({start}) for non-recyclable datapool. "
+                    f"Use RecyclableDatapool if you need wrap-around behavior."
+                )
+
         return iter(self._items[start:stop])

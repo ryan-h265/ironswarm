@@ -130,9 +130,11 @@ class FileDatapool(DatapoolBase):
         Yields:
             str: Each line in the file within the specified range, decoded as UTF-8 and stripped of whitespace.
 
+        Raises:
+            ValueError: If start is negative, start exceeds datapool length, stop is negative,
+                       or stop < start for non-recyclable datapool.
+
         Behavior:
-            - If 'start' is beyond the end of the file, yields nothing.
-            - If 'stop' is less than or equal to 'start', yields nothing.
             - Lines are counted starting from 0.
             - Uses the metadata file for fast seeking; assumes the metadata file exists (created in __init__).
             - Efficient for large files: does not load the entire file into memory.
@@ -140,6 +142,25 @@ class FileDatapool(DatapoolBase):
         Example:
             For a file with lines 0..9, checkout(2, 5) yields lines 2, 3, 4.
         """
+        # Validate start index
+        if start < 0:
+            raise ValueError(f"start must be non-negative, got {start}")
+
+        if start > len(self):
+            raise ValueError(f"start index {start} exceeds datapool length {len(self)}")
+
+        # Validate stop index if provided
+        if stop is not None:
+            if stop < 0:
+                raise ValueError(f"stop must be non-negative, got {stop}")
+
+            # For non-recyclable datapool, stop must be >= start
+            if not self._recyclable and stop < start:
+                raise ValueError(
+                    f"stop ({stop}) must be >= start ({start}) for non-recyclable datapool. "
+                    f"Use RecyclableFileDatapool if you need wrap-around behavior."
+                )
+
         return self._extract_chunk(start, stop)
 
     def _extract_chunk(self, start: int, stop: int | None = None) -> Generator[str, None, None]:

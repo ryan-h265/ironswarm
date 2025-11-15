@@ -28,6 +28,9 @@ class RecyclableDatapool(IterableDatapool):
         Returns:
             Iterator[Any]: An iterator over the selected items in the datapool, with wrap-around if needed.
 
+        Raises:
+            ValueError: If start is negative, start exceeds datapool length, or stop is negative.
+
         Behavior:
             - If stop < start, yields items from start to end, then from 0 to stop (wrap-around).
             - Otherwise, yields items from start to stop as usual.
@@ -35,6 +38,17 @@ class RecyclableDatapool(IterableDatapool):
         Example:
             checkout(8, 2) yields items at indices 8, 9, 0, 1 (wrap-around).
         """
+        # Validate start index
+        if start < 0:
+            raise ValueError(f"start must be non-negative, got {start}")
+
+        if start > len(self):
+            raise ValueError(f"start index {start} exceeds datapool length {len(self)}")
+
+        # Validate stop index if provided
+        if stop is not None and stop < 0:
+            raise ValueError(f"stop must be non-negative, got {stop}")
+
         if stop is not None and stop < start:
             # Wrap around: from start to end, then from beginning to stop
             first_chunk = iter(self._items[start:])
