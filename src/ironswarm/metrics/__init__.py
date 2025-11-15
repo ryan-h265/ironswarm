@@ -16,6 +16,7 @@ from .collector import (
 )
 from .graphs import generate_graphs
 from .report import format_report, summarize_snapshot
+from . import aggregator
 
 __all__ = [
     "CounterMetric",
@@ -27,4 +28,5 @@ __all__ = [
     "generate_graphs",
     "collector",
     "get_collector",
+    "aggregator",
 ]

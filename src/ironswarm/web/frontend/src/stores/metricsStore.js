@@ -128,7 +128,7 @@ export const useMetricsStore = defineStore('metrics', () => {
   // Actions
   async function fetchCurrentMetrics() {
     try {
-      const response = await axios.get('/api/metrics/current')
+      const response = await axios.get('/api/metrics/current?scope=cluster')
       currentSnapshot.value = response.data
       addToHistory(response.data)
     } catch (error) {
