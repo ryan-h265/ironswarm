@@ -16,10 +16,11 @@ from typing import Optional
 
 from aiohttp import web
 
+import ironswarm.metrics.aggregator as aggregator
+
 from ironswarm.metrics.collector import collector
 from ironswarm.metrics.graphs import generate_graphs
 from ironswarm.metrics.report import format_report
-from ironswarm.metrics import aggregator
 from ironswarm.metrics_snapshot import MetricsSnapshot
 from ironswarm.scenario_discovery import discover_scenarios, ScenarioValidationError
 
