@@ -41,31 +41,82 @@ class FileDatapool(DatapoolBase):
         # - Metadata file doesn't exist
         # - Force regeneration is requested
         # - Source file was modified after metadata was created (stale metadata)
+        # - Metadata file is corrupted
         metadata_is_stale = (
             os.path.exists(self.meta_filename) and
             os.path.getmtime(filename) > os.path.getmtime(self.meta_filename)
         )
 
-        if not os.path.exists(self.meta_filename) or self.force_metadata_creation or metadata_is_stale:
+        metadata_is_corrupted = (
+            os.path.exists(self.meta_filename) and
+            not self._validate_metadata()
+        )
+
+        if not os.path.exists(self.meta_filename) or self.force_metadata_creation or metadata_is_stale or metadata_is_corrupted:
             self._process_data_file()
+
+    def _validate_metadata(self) -> bool:
+        """
+        Validates that the metadata file is well-formed and contains valid data.
+
+        Returns:
+            bool: True if metadata is valid, False if corrupted or malformed.
+
+        Checks performed:
+            - File is not empty
+            - Each line has exactly 2 comma-separated values
+            - Both values are valid integers
+            - Line numbers and seek points are non-negative
+        """
+        try:
+            with open(self.meta_filename) as mf:
+                has_content = False
+                for line in mf:
+                    has_content = True
+                    line = line.strip()
+                    if not line:
+                        continue  # Skip empty lines
+
+                    parts = line.split(',')
+                    if len(parts) != 2:
+                        return False  # Invalid format
+
+                    line_number, seek_point = parts
+                    # Validate both are integers and non-negative
+                    if not line_number.isdigit() or not seek_point.isdigit():
+                        return False
+
+                    if int(line_number) < 0 or int(seek_point) < 0:
+                        return False
+
+                return has_content  # Must have at least one valid line
+        except (OSError, IOError):
+            return False  # Can't read file = invalid
 
     @lru_cache
     def __len__(self):
         # Go to the last line of the meta file and extract its content
         # Seek the position on the file and iterate until the eof counting the lines
-        with open(self.meta_filename) as mf:
-            last_line = None
-            for last_line in mf:
-                pass
-            if last_line is None:
-                return 0  # Empty file
-            line_number, seek_point = last_line.strip().split(',')
-        with open(self.filename, "rb") as f:
-            f.seek(int(seek_point))
-            current_line_number = int(line_number)
-            for _ in f:  # type: bytes
-                current_line_number += 1
-        return current_line_number
+        try:
+            with open(self.meta_filename) as mf:
+                last_line = None
+                for last_line in mf:
+                    pass
+                if last_line is None:
+                    return 0  # Empty file
+                line_number, seek_point = last_line.strip().split(',')
+            with open(self.filename, "rb") as f:
+                f.seek(int(seek_point))
+                current_line_number = int(line_number)
+                for _ in f:  # type: bytes
+                    current_line_number += 1
+            return current_line_number
+        except (ValueError, OSError, IOError) as e:
+            # Metadata is corrupted or inaccessible, regenerate it
+            self._process_data_file()
+            # Clear the cache and retry
+            self.__len__.cache_clear()
+            return self.__len__()
 
     def checkout(self, start: int = 0, stop: int | None = None):
         """
@@ -140,17 +191,22 @@ class FileDatapool(DatapoolBase):
         Returns:
             tuple: (closest_line_number, closest_seek_point) where closest_line_number <= start.
         """
-        closest_line_number = 0
-        closest_seek_point = 0
-        with open(self.meta_filename) as mf:
-            for meta_line in mf:
-                line_number, seek_point = map(int, meta_line.strip().split(","))
-                if line_number <= start:
-                    closest_line_number = line_number
-                    closest_seek_point = seek_point
-                else:
-                    break
-        return closest_line_number, closest_seek_point
+        try:
+            closest_line_number = 0
+            closest_seek_point = 0
+            with open(self.meta_filename) as mf:
+                for meta_line in mf:
+                    line_number, seek_point = map(int, meta_line.strip().split(","))
+                    if line_number <= start:
+                        closest_line_number = line_number
+                        closest_seek_point = seek_point
+                    else:
+                        break
+            return closest_line_number, closest_seek_point
+        except (ValueError, OSError, IOError) as e:
+            # Metadata is corrupted, regenerate it and return start from beginning
+            self._process_data_file()
+            return 0, 0
 
     def _process_data_file(self, buffer_size: int = 1024 * 1024):
         """

@@ -241,6 +241,96 @@ def test_file_datapool_stale_metadata_detection():
         os.remove(temp_filename)
         os.remove(file_dp.meta_filename)
 
+def test_file_datapool_corrupted_metadata_invalid_format():
+    """Test that FileDatapool handles corrupted metadata with invalid format."""
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        temp_file.write(b"Line 1\nLine 2\nLine 3\n")
+        temp_filename = temp_file.name
+    try:
+        # Create initial datapool with valid metadata
+        file_dp = FileDatapool(temp_filename)
+        assert len(file_dp) == 3
+
+        # Corrupt the metadata file - invalid format (missing comma)
+        with open(file_dp.meta_filename, "w") as mf:
+            mf.write("1000 5000\n")  # Should be "1000,5000"
+            mf.write("invalid data here\n")
+
+        # Should regenerate metadata instead of crashing
+        file_dp2 = FileDatapool(temp_filename)
+        assert len(file_dp2) == 3
+        result = list(file_dp2.checkout(start=0, stop=3))
+        assert result == ["Line 1", "Line 2", "Line 3"]
+    finally:
+        os.remove(temp_filename)
+        if os.path.exists(file_dp.meta_filename):
+            os.remove(file_dp.meta_filename)
+
+def test_file_datapool_corrupted_metadata_non_numeric():
+    """Test that FileDatapool handles corrupted metadata with non-numeric values."""
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        temp_file.write(b"Line 1\nLine 2\nLine 3\n")
+        temp_filename = temp_file.name
+    try:
+        # Create initial datapool
+        file_dp = FileDatapool(temp_filename)
+
+        # Corrupt the metadata file - non-numeric values
+        with open(file_dp.meta_filename, "w") as mf:
+            mf.write("abc,def\n")
+
+        # Should regenerate metadata instead of crashing
+        file_dp2 = FileDatapool(temp_filename)
+        assert len(file_dp2) == 3
+    finally:
+        os.remove(temp_filename)
+        if os.path.exists(file_dp.meta_filename):
+            os.remove(file_dp.meta_filename)
+
+def test_file_datapool_empty_metadata_file():
+    """Test that FileDatapool handles empty metadata file."""
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        temp_file.write(b"Line 1\nLine 2\nLine 3\n")
+        temp_filename = temp_file.name
+    try:
+        # Create initial datapool
+        file_dp = FileDatapool(temp_filename)
+
+        # Make metadata file empty
+        with open(file_dp.meta_filename, "w") as mf:
+            pass  # Empty file
+
+        # Should regenerate metadata instead of returning 0
+        file_dp2 = FileDatapool(temp_filename)
+        assert len(file_dp2) == 3
+    finally:
+        os.remove(temp_filename)
+        if os.path.exists(file_dp.meta_filename):
+            os.remove(file_dp.meta_filename)
+
+def test_file_datapool_seek_with_corrupted_metadata():
+    """Test that _seek_closest_point handles corrupted metadata gracefully."""
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        temp_file.write(b"Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n")
+        temp_filename = temp_file.name
+    try:
+        # Create initial datapool
+        file_dp = FileDatapool(temp_filename)
+
+        # Corrupt the metadata file
+        with open(file_dp.meta_filename, "w") as mf:
+            mf.write("not,valid,format\n")
+            mf.write("still broken\n")
+
+        # Should regenerate and work correctly
+        file_dp2 = FileDatapool(temp_filename)
+        result = list(file_dp2.checkout(start=2, stop=4))
+        assert result == ["Line 3", "Line 4"]
+    finally:
+        os.remove(temp_filename)
+        if os.path.exists(file_dp.meta_filename):
+            os.remove(file_dp.meta_filename)
+
 ## MISCELLANEOUS
 
 def test_process_large_data_file_waiting_time():
