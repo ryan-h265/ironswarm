@@ -36,6 +36,11 @@ const routes = [
     name: 'Datapools',
     component: () => import('./views/DatapoolView.vue'),
   },
+  {
+    path: '/scenario-builder',
+    name: 'ScenarioBuilder',
+    component: () => import('./views/ScenarioBuilderView.vue'),
+  },
 ]
 
 const router = createRouter({

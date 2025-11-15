@@ -819,6 +819,290 @@ async def delete_datapool(request: web.Request) -> web.Response:
         }, status=500)
 
 
+async def post_parse_curl(request: web.Request) -> web.Response:
+    """Parse a curl command and extract HTTP request details."""
+    try:
+        data = await request.json()
+        curl_command = data.get("curl_command", "")
+
+        if not curl_command:
+            return json_response({
+                "error": "curl_command is required",
+            }, status=400)
+
+        # Basic curl parsing
+        import shlex
+
+        parts = shlex.split(curl_command)
+
+        # Initialize parsed data
+        parsed = {
+            "method": "GET",
+            "url": "",
+            "headers": {},
+            "body": "",
+            "query_params": {}
+        }
+
+        i = 0
+        while i < len(parts):
+            part = parts[i]
+
+            # Skip 'curl' command itself
+            if part == "curl":
+                i += 1
+                continue
+
+            # Method
+            if part in ["-X", "--request"]:
+                if i + 1 < len(parts):
+                    parsed["method"] = parts[i + 1].upper()
+                    i += 2
+                    continue
+
+            # Headers
+            if part in ["-H", "--header"]:
+                if i + 1 < len(parts):
+                    header = parts[i + 1]
+                    if ":" in header:
+                        key, value = header.split(":", 1)
+                        parsed["headers"][key.strip()] = value.strip()
+                    i += 2
+                    continue
+
+            # Data/Body
+            if part in ["-d", "--data", "--data-raw", "--data-binary"]:
+                if i + 1 < len(parts):
+                    parsed["body"] = parts[i + 1]
+                    if parsed["method"] == "GET":
+                        parsed["method"] = "POST"
+                    i += 2
+                    continue
+
+            # URL (usually the last non-flag argument)
+            if not part.startswith("-") and not parsed["url"]:
+                url = part
+                # Extract query params from URL
+                if "?" in url:
+                    base_url, query_string = url.split("?", 1)
+                    parsed["url"] = base_url
+                    for param in query_string.split("&"):
+                        if "=" in param:
+                            key, value = param.split("=", 1)
+                            parsed["query_params"][key] = value
+                else:
+                    parsed["url"] = url
+
+            i += 1
+
+        return json_response(parsed)
+
+    except Exception as e:
+        logger.error(f"Failed to parse curl command: {e}", exc_info=True)
+        return json_response({
+            "error": str(e),
+        }, status=400)
+
+
+async def post_scenario_builder_save(request: web.Request) -> web.Response:
+    """Generate and save a scenario Python file from builder config."""
+    node = request.app["node"]
+
+    try:
+        config = await request.json()
+
+        # Extract configuration
+        scenario_name = config.get("name", "generated_scenario")
+        delay = config.get("delay", 0)
+        journeys = config.get("journeys", [])
+
+        if not journeys:
+            return json_response({
+                "error": "At least one journey is required",
+            }, status=400)
+
+        # Generate Python code
+        python_code = _generate_scenario_code(scenario_name, delay, journeys)
+
+        # Save to scenarios directory
+        filename = f"{scenario_name}.py"
+        file_path = node.scenarios_dir / filename
+
+        file_path.write_text(python_code)
+
+        return json_response({
+            "status": "saved",
+            "filename": filename,
+            "code": python_code,
+        }, status=201)
+
+    except Exception as e:
+        logger.error(f"Failed to save scenario: {e}", exc_info=True)
+        return json_response({
+            "error": str(e),
+        }, status=500)
+
+
+async def post_scenario_builder_preview(request: web.Request) -> web.Response:
+    """Generate Python code preview without saving."""
+    try:
+        config = await request.json()
+
+        scenario_name = config.get("name", "generated_scenario")
+        delay = config.get("delay", 0)
+        journeys = config.get("journeys", [])
+
+        python_code = _generate_scenario_code(scenario_name, delay, journeys)
+
+        return json_response({
+            "code": python_code,
+        })
+
+    except Exception as e:
+        logger.error(f"Failed to generate preview: {e}", exc_info=True)
+        return json_response({
+            "error": str(e),
+        }, status=400)
+
+
+def _generate_scenario_code(scenario_name: str, delay: int, journeys: list) -> str:
+    """Generate Python code for a scenario."""
+
+    # Build imports
+    imports = [
+        "import asyncio",
+        "import os",
+        "import random",
+        "",
+        "from ironswarm.journey.http import http_session",
+        "from ironswarm.scenario import Journey, Scenario",
+        "from ironswarm.volumemodel import VolumeModel",
+    ]
+
+    # Check if any journey uses datapools
+    uses_datapools = any(j.get("datapool") for j in journeys)
+    if uses_datapools:
+        imports.append("from ironswarm.datapools import FileDatapool, IterableDatapool, RecyclableDatapool, RecyclableFileDatapool")
+
+    code_lines = imports + ["", ""]
+
+    # Add base URL (if any journey uses it)
+    uses_base_url = any(
+        any(req.get("url", "").startswith("http") for req in j.get("requests", []))
+        for j in journeys
+    )
+
+    if uses_base_url:
+        code_lines.extend([
+            f'base_url = os.getenv("{scenario_name.upper()}_BASE_URL", "http://127.0.0.1:8080").rstrip("/")',
+            "",
+            ""
+        ])
+
+    # Helper function
+    code_lines.extend([
+        "def _record_response(context, method: str, url: str, resp) -> None:",
+        '    context.log(f"{method} {url} - Status: {resp.status}")',
+        "",
+        ""
+    ])
+
+    # Generate journey functions
+    for journey in journeys:
+        journey_name = journey.get("name", "unnamed_journey")
+        requests = journey.get("requests", [])
+        has_datapool = journey.get("datapool") is not None
+
+        # Function signature
+        if has_datapool:
+            code_lines.append(f"@http_session()")
+            code_lines.append(f"async def {journey_name}(context, datapool_item):")
+        else:
+            code_lines.append(f"@http_session()")
+            code_lines.append(f"async def {journey_name}(context):")
+
+        # Generate request code
+        if not requests:
+            code_lines.append("    pass")
+        else:
+            for req in requests:
+                method = req.get("method", "GET").lower()
+                url = req.get("url", "")
+                headers = req.get("headers", {})
+                body = req.get("body", "")
+                query_params = req.get("query_params", {})
+
+                # Build URL
+                url_var = f'    url = "{url}"'
+                if query_params:
+                    params_str = "&".join([f"{k}={v}" for k, v in query_params.items()])
+                    url_var = f'    url = "{url}?{params_str}"'
+                code_lines.append(url_var)
+
+                # Build request
+                request_line = f"    async with context.session.{method}(url"
+
+                # Add headers if present
+                if headers:
+                    headers_str = ", ".join([f'"{k}": "{v}"' for k, v in headers.items()])
+                    request_line += f", headers={{{headers_str}}}"
+
+                # Add body if present
+                if body and method in ["post", "put", "patch"]:
+                    try:
+                        # Try to parse as JSON
+                        import json as json_module
+                        json_module.loads(body)
+                        request_line += f", json={body}"
+                    except:
+                        request_line += f', data="{body}"'
+
+                request_line += ") as resp:"
+                code_lines.append(request_line)
+                code_lines.append(f'        _record_response(context, "{method.upper()}", url, resp)')
+                code_lines.append("")
+
+        code_lines.append("")
+
+    # Generate scenario definition
+    code_lines.append("")
+    code_lines.append("scenario = Scenario(")
+    code_lines.append("    journeys=[")
+
+    for journey in journeys:
+        journey_name = journey.get("name", "unnamed_journey")
+        datapool_config = journey.get("datapool")
+        volume_model = journey.get("volumeModel", {})
+
+        target = volume_model.get("target", 10)
+        duration = volume_model.get("duration", 60)
+
+        # Build datapool part
+        if datapool_config:
+            dp_type = datapool_config.get("type", "RecyclableDatapool")
+            dp_source = datapool_config.get("source", "")
+
+            if dp_type in ["FileDatapool", "RecyclableFileDatapool"]:
+                datapool_str = f'{dp_type}("{dp_source}")'
+            elif dp_type in ["IterableDatapool", "RecyclableDatapool"]:
+                # For iterable, source might be a list
+                datapool_str = f'{dp_type}({dp_source})'
+            else:
+                datapool_str = "None"
+        else:
+            datapool_str = "None"
+
+        journey_line = f'        Journey("scenarios.{scenario_name}:{journey_name}", {datapool_str}, VolumeModel(target={target}, duration={duration})),'
+        code_lines.append(journey_line)
+
+    code_lines.append("    ],")
+    code_lines.append(f"    delay={delay},")
+    code_lines.append(")")
+    code_lines.append("")
+
+    return "\n".join(code_lines)
+
+
 async def get_debug_state(request: web.Request) -> web.Response:
     """Debug endpoint to view raw node state."""
     node = request.app["node"]
@@ -902,3 +1186,7 @@ def setup_api_routes(app: web.Application, node, ws_manager):
     app.router.add_get("/api/datapools/{datapool_name}", get_datapool)
     app.router.add_get("/api/datapools/{datapool_name}/download", download_datapool)
     app.router.add_delete("/api/datapools/{datapool_name}", delete_datapool)
+    # Scenario builder routes
+    app.router.add_post("/api/scenario-builder/parse-curl", post_parse_curl)
+    app.router.add_post("/api/scenario-builder/save", post_scenario_builder_save)
+    app.router.add_post("/api/scenario-builder/preview", post_scenario_builder_preview)

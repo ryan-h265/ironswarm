@@ -64,6 +64,7 @@ const currentTime = ref('')
 const routes = [
   { path: '/', name: 'Cluster', icon: '⬢' },
   { path: '/scenarios', name: 'Scenarios', icon: '⚡' },
+  { path: '/scenario-builder', name: 'Builder', icon: '⚙️' },
   { path: '/datapools', name: 'Datapools', icon: '💾' },
   { path: '/metrics', name: 'Metrics', icon: '◈' },
   { path: '/graphs', name: 'Graphs', icon: '▲' },

@@ -1,0 +1,298 @@
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import axios from 'axios'
+
+export const useScenarioBuilderStore = defineStore('scenarioBuilder', () => {
+  // State
+  const scenarioName = ref('my_scenario')
+  const delay = ref(0)
+  const journeys = ref([])
+  const selectedJourneyIndex = ref(null)
+  const generatedCode = ref('')
+  const isLoading = ref(false)
+  const error = ref(null)
+
+  // Getters
+  const selectedJourney = computed(() => {
+    if (selectedJourneyIndex.value !== null && journeys.value[selectedJourneyIndex.value]) {
+      return journeys.value[selectedJourneyIndex.value]
+    }
+    return null
+  })
+
+  const hasJourneys = computed(() => journeys.value.length > 0)
+
+  const isValid = computed(() => {
+    return scenarioName.value.trim() !== '' && journeys.value.length > 0
+  })
+
+  // Journey template
+  function createJourney() {
+    return {
+      name: `journey_${journeys.value.length + 1}`,
+      requests: [],
+      datapool: null,
+      volumeModel: {
+        target: 10,
+        duration: 60
+      }
+    }
+  }
+
+  // HTTP Request template
+  function createRequest() {
+    return {
+      method: 'GET',
+      url: '',
+      headers: {},
+      body: '',
+      query_params: {}
+    }
+  }
+
+  // Actions - Journey Management
+  function addJourney() {
+    const newJourney = createJourney()
+    journeys.value.push(newJourney)
+    selectedJourneyIndex.value = journeys.value.length - 1
+  }
+
+  function duplicateJourney(index) {
+    if (index >= 0 && index < journeys.value.length) {
+      const original = journeys.value[index]
+      const duplicate = JSON.parse(JSON.stringify(original))
+      duplicate.name = `${original.name}_copy`
+      journeys.value.splice(index + 1, 0, duplicate)
+      selectedJourneyIndex.value = index + 1
+    }
+  }
+
+  function deleteJourney(index) {
+    if (index >= 0 && index < journeys.value.length) {
+      journeys.value.splice(index, 1)
+      if (selectedJourneyIndex.value === index) {
+        selectedJourneyIndex.value = journeys.value.length > 0 ? 0 : null
+      } else if (selectedJourneyIndex.value > index) {
+        selectedJourneyIndex.value--
+      }
+    }
+  }
+
+  function moveJourney(index, direction) {
+    if (direction === 'up' && index > 0) {
+      const temp = journeys.value[index]
+      journeys.value[index] = journeys.value[index - 1]
+      journeys.value[index - 1] = temp
+      if (selectedJourneyIndex.value === index) {
+        selectedJourneyIndex.value = index - 1
+      }
+    } else if (direction === 'down' && index < journeys.value.length - 1) {
+      const temp = journeys.value[index]
+      journeys.value[index] = journeys.value[index + 1]
+      journeys.value[index + 1] = temp
+      if (selectedJourneyIndex.value === index) {
+        selectedJourneyIndex.value = index + 1
+      }
+    }
+  }
+
+  function selectJourney(index) {
+    if (index >= 0 && index < journeys.value.length) {
+      selectedJourneyIndex.value = index
+    }
+  }
+
+  // Actions - Request Management
+  function addRequest(journeyIndex = null) {
+    const index = journeyIndex !== null ? journeyIndex : selectedJourneyIndex.value
+    if (index !== null && journeys.value[index]) {
+      const newRequest = createRequest()
+      journeys.value[index].requests.push(newRequest)
+    }
+  }
+
+  function updateRequest(journeyIndex, requestIndex, updatedRequest) {
+    if (journeys.value[journeyIndex] && journeys.value[journeyIndex].requests[requestIndex]) {
+      journeys.value[journeyIndex].requests[requestIndex] = updatedRequest
+    }
+  }
+
+  function deleteRequest(journeyIndex, requestIndex) {
+    if (journeys.value[journeyIndex] && journeys.value[journeyIndex].requests[requestIndex]) {
+      journeys.value[journeyIndex].requests.splice(requestIndex, 1)
+    }
+  }
+
+  function moveRequest(journeyIndex, requestIndex, direction) {
+    const requests = journeys.value[journeyIndex]?.requests
+    if (!requests) return
+
+    if (direction === 'up' && requestIndex > 0) {
+      const temp = requests[requestIndex]
+      requests[requestIndex] = requests[requestIndex - 1]
+      requests[requestIndex - 1] = temp
+    } else if (direction === 'down' && requestIndex < requests.length - 1) {
+      const temp = requests[requestIndex]
+      requests[requestIndex] = requests[requestIndex + 1]
+      requests[requestIndex + 1] = temp
+    }
+  }
+
+  // Actions - Curl Parser
+  async function parseCurl(curlCommand) {
+    isLoading.value = true
+    error.value = null
+    try {
+      const response = await axios.post('/api/scenario-builder/parse-curl', {
+        curl_command: curlCommand
+      })
+      return response.data
+    } catch (err) {
+      console.error('Failed to parse curl command:', err)
+      error.value = err.response?.data?.error || 'Failed to parse curl command'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  async function addRequestFromCurl(curlCommand, journeyIndex = null) {
+    try {
+      const parsedRequest = await parseCurl(curlCommand)
+      const index = journeyIndex !== null ? journeyIndex : selectedJourneyIndex.value
+      if (index !== null && journeys.value[index]) {
+        journeys.value[index].requests.push(parsedRequest)
+      }
+    } catch (err) {
+      console.error('Failed to add request from curl:', err)
+      throw err
+    }
+  }
+
+  // Actions - Code Generation
+  async function generatePreview() {
+    isLoading.value = true
+    error.value = null
+    try {
+      const response = await axios.post('/api/scenario-builder/preview', {
+        name: scenarioName.value,
+        delay: delay.value,
+        journeys: journeys.value
+      })
+      generatedCode.value = response.data.code
+      return response.data.code
+    } catch (err) {
+      console.error('Failed to generate preview:', err)
+      error.value = err.response?.data?.error || 'Failed to generate preview'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  async function saveScenario(customCode = null) {
+    isLoading.value = true
+    error.value = null
+    try {
+      const response = await axios.post('/api/scenario-builder/save', {
+        name: scenarioName.value,
+        delay: delay.value,
+        journeys: journeys.value,
+        custom_code: customCode
+      })
+      generatedCode.value = response.data.code
+      return response.data
+    } catch (err) {
+      console.error('Failed to save scenario:', err)
+      error.value = err.response?.data?.error || 'Failed to save scenario'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  // Actions - Datapool Management
+  function setDatapool(journeyIndex, datapoolConfig) {
+    if (journeys.value[journeyIndex]) {
+      journeys.value[journeyIndex].datapool = datapoolConfig
+    }
+  }
+
+  function removeDatapool(journeyIndex) {
+    if (journeys.value[journeyIndex]) {
+      journeys.value[journeyIndex].datapool = null
+    }
+  }
+
+  // Actions - Volume Model
+  function updateVolumeModel(journeyIndex, volumeModel) {
+    if (journeys.value[journeyIndex]) {
+      journeys.value[journeyIndex].volumeModel = volumeModel
+    }
+  }
+
+  // Actions - Reset
+  function reset() {
+    scenarioName.value = 'my_scenario'
+    delay.value = 0
+    journeys.value = []
+    selectedJourneyIndex.value = null
+    generatedCode.value = ''
+    error.value = null
+  }
+
+  function clearError() {
+    error.value = null
+  }
+
+  // Load scenario from existing file (to be implemented when needed)
+  async function loadScenario(scenarioFile) {
+    // This would parse an existing Python scenario file
+    // For now, it's a placeholder
+    console.log('Load scenario:', scenarioFile)
+  }
+
+  return {
+    // State
+    scenarioName,
+    delay,
+    journeys,
+    selectedJourneyIndex,
+    generatedCode,
+    isLoading,
+    error,
+    // Getters
+    selectedJourney,
+    hasJourneys,
+    isValid,
+    // Journey actions
+    addJourney,
+    duplicateJourney,
+    deleteJourney,
+    moveJourney,
+    selectJourney,
+    // Request actions
+    addRequest,
+    updateRequest,
+    deleteRequest,
+    moveRequest,
+    // Curl parser
+    parseCurl,
+    addRequestFromCurl,
+    // Code generation
+    generatePreview,
+    saveScenario,
+    // Datapool
+    setDatapool,
+    removeDatapool,
+    // Volume model
+    updateVolumeModel,
+    // Utility
+    reset,
+    clearError,
+    loadScenario,
+    // Templates
+    createJourney,
+    createRequest,
+  }
+})
