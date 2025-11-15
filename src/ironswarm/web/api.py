@@ -4,6 +4,7 @@ REST API endpoints for IronSwarm dashboard.
 Provides endpoints for cluster info, scenario management, metrics, and exports.
 """
 
+import ast
 import asyncio
 import io
 import json
