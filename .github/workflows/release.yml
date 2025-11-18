@@ -29,6 +29,14 @@ jobs:
       - name: Install Hatch
         run: pip install hatch
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build frontend
+        run: ./scripts/build-frontend.sh
+
       - name: Build package
         run: hatch build
 
