@@ -39,6 +39,19 @@
 
   /* Fonts */
   --font-mono: 'JetBrains Mono', 'IBM Plex Mono', 'Courier New', monospace;
+
+  /* Abbreviated aliases for backward compatibility */
+  --bg-primary: var(--color-bg-primary);
+  --bg-secondary: var(--color-bg-surface);
+  --bg-surface: var(--color-bg-surface);
+  --bg-panel: var(--color-bg-panel);
+  --cyan: var(--color-cyan);
+  --amber: var(--color-amber);
+  --danger: var(--color-danger);
+  --success: var(--color-success);
+  --text-primary: var(--color-text-primary);
+  --text-muted: var(--color-text-muted);
+  --text-dim: var(--color-text-dim);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -263,6 +276,28 @@ button:disabled {
 button:disabled:hover {
   background: transparent;
   box-shadow: none;
+}
+
+button.primary {
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--color-success);
+  color: var(--color-bg-primary);
+}
+
+button.add-btn {
+  border-color: var(--color-amber);
+  color: var(--color-amber);
+  padding: 8px 12px;
+  font-size: 11px;
+}
+
+button.add-btn:hover:not(:disabled) {
+  background: var(--color-amber);
+  color: var(--color-bg-primary);
 }
 
 /* ═══════════════════════════════════════════════════════════════════

@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from itertools import chain
 
 from ironswarm.datapools.file_datapool import FileDatapool
@@ -14,7 +15,7 @@ class RecyclableFileDatapool(FileDatapool):
         super().__init__(filename)
         self._recyclable = True
 
-    def checkout(self, start: int = 0, stop: int | None = None):
+    def checkout(self, start: int = 0, stop: int | None = None) -> Iterator[str]:
         """
         Yield lines from the file between start (inclusive) and stop (exclusive), with wrap-around if stop < start.
         Uses metadata for fast seeking via _extract_chunk. Lines are 0-based.
@@ -26,6 +27,9 @@ class RecyclableFileDatapool(FileDatapool):
         Yields:
             str: Each line in the specified range, decoded and stripped.
 
+        Raises:
+            ValueError: If start is negative, start exceeds datapool length, or stop is negative.
+
         Behavior:
             - If stop < start, yields lines from start to end, then wraps to beginning and yields up to stop.
             - If stop == start, yields nothing.
@@ -34,7 +38,18 @@ class RecyclableFileDatapool(FileDatapool):
         Example:
             For lines 0..9, checkout(8, 2) yields lines 8, 9, 0, 1 (wrap-around).
         """
-        if stop and stop < start:
+        # Validate start index
+        if start < 0:
+            raise ValueError(f"start must be non-negative, got {start}")
+
+        if start > len(self):
+            raise ValueError(f"start index {start} exceeds datapool length {len(self)}")
+
+        # Validate stop index if provided
+        if stop is not None and stop < 0:
+            raise ValueError(f"stop must be non-negative, got {stop}")
+
+        if stop is not None and stop < start:
             first_chunk =  self._extract_chunk(start, len(self))
             second_chunk =  self._extract_chunk(0, stop)
             return chain(first_chunk, second_chunk)

@@ -290,7 +290,13 @@ class ScenarioManager:
                 )
                 checkout_start = journey.datapool.index + node_offset
                 checkout_stop = checkout_start + node_total_journeys[self.node.index]
-                datapool_chunk = journey.datapool.checkout(checkout_start, checkout_stop)
+
+                # Check if datapool is exhausted before attempting checkout
+                if checkout_start > len(journey.datapool):
+                    # Datapool exhausted, return empty iterator
+                    datapool_chunk = iter([])
+                else:
+                    datapool_chunk = journey.datapool.checkout(checkout_start, checkout_stop)
 
                 journey.datapool.index += total_journey_calls
 

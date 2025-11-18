@@ -73,6 +73,29 @@ check = "mypy --install-types --non-interactive {args:src/ironswarm tests}"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ironswarm"]
+# Exclude frontend source files (Vue.js, node_modules, etc.)
+# Built static assets in web/static/ are included
+exclude = [
+  "src/ironswarm/web/frontend/node_modules",
+  "src/ironswarm/web/frontend/src",
+  "src/ironswarm/web/frontend/public",
+  "src/ironswarm/web/frontend/package.json",
+  "src/ironswarm/web/frontend/package-lock.json",
+  "src/ironswarm/web/frontend/vite.config.js",
+  "src/ironswarm/web/frontend/index.html",
+  "src/ironswarm/web/frontend/.gitignore",
+]
+
+[tool.hatch.build.targets.sdist]
+# Source distribution includes frontend source for development
+# but built assets should be generated during build process
+include = [
+  "src/",
+  "scripts/",
+  "pyproject.toml",
+  "README.md",
+  "LICENSE",
+]
 
 [tool.coverage.run]
 source_pkgs = ["ironswarm", "tests"]

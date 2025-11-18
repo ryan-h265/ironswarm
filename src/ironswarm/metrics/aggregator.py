@@ -41,9 +41,14 @@ class _HistogramAccumulator:
     samples: dict[_LabelKey, _HistogramSampleAccumulator] = field(default_factory=dict)
 
 
-def get_cluster_snapshot(snapshots: Iterable[MetricsSnapshot]) -> dict:
-    """Aggregate metrics from all snapshots into a single view."""
+def aggregate_snapshots(snapshots: Iterable[MetricsSnapshot]) -> dict[str, Any]:
+    """Public helper retained for backwards compatibility."""
     return _aggregate_snapshots(list(snapshots))
+
+
+def get_cluster_snapshot(snapshots: Iterable[MetricsSnapshot]) -> dict[str, Any]:
+    """Aggregate metrics from all snapshots into a single view."""
+    return aggregate_snapshots(snapshots)
 
 
 def query_time_window(

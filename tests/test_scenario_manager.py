@@ -303,6 +303,50 @@ async def test_scenario_manager_spawn_journeys():
         "Background tasks should be tracked (may complete immediately in test)"
 
 
+@pytest.mark.asyncio
+async def test_scenario_immediate_termination():
+    """Test that scenarios terminate immediately when stopped, without waiting for interval."""
+    # Create a scenario with a long interval (30 seconds)
+    long_interval_scenario = Scenario(
+        journeys=[
+            Journey("tests.test_scenario_manager:dummy_journey", None, VolumeModel(target=1, duration=60)),
+        ],
+        interval=30  # Long interval that would normally block termination
+    )
+
+    mock_node = MockNode(index=0, count=1)
+    sm = ScenarioManager(mock_node, time.time(), long_interval_scenario)
+
+    # Start the scenario in the background
+    resolve_task = asyncio.create_task(sm.resolve())
+
+    # Wait a short time to ensure the scenario is running
+    await asyncio.sleep(0.5)
+
+    # Record when we request termination
+    stop_time = time.time()
+
+    # Stop the scenario
+    await sm.cancel_tasks()
+
+    # Wait for the resolve task to complete
+    try:
+        await asyncio.wait_for(resolve_task, timeout=5.0)
+    except asyncio.TimeoutError:
+        pytest.fail("Scenario did not terminate within 5 seconds after stop request")
+
+    # Measure how long termination took
+    termination_duration = time.time() - stop_time
+
+    # Assert that termination was immediate (much less than the 30-second interval)
+    # Allow up to 2 seconds for processing overhead
+    assert termination_duration < 2.0, \
+        f"Scenario took {termination_duration:.2f}s to terminate, expected < 2s (interval was 30s)"
+
+    # Verify the scenario is no longer running
+    assert not sm.running
+
+
 # Tests for node_target_volume() function
 
 class TestNodeTargetVolume:
