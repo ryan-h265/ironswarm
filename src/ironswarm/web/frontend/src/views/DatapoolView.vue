@@ -139,71 +139,70 @@
     </div>
 
     <!-- Datapool Preview Modal -->
-    <div v-if="showPreview" class="modal-overlay" @click.self="closePreview">
-      <div class="modal-content panel">
-        <div class="modal-header">
-          <h3 class="modal-title">{{ datapoolStore.selectedDatapool?.name }}</h3>
-          <button @click="closePreview" class="close-btn">✕</button>
-        </div>
-
-        <div v-if="datapoolStore.selectedDatapool" class="modal-body">
-          <div class="preview-stats">
-            <div class="stat-row">
-              <span class="label">LINES:</span>
-              <span class="value text-cyan">{{ datapoolStore.selectedDatapool.line_count.toLocaleString() }}</span>
-            </div>
-            <div class="stat-row">
-              <span class="label">SIZE:</span>
-              <span class="value text-amber">{{ formatBytes(datapoolStore.selectedDatapool.size) }}</span>
-            </div>
-            <div class="stat-row">
-              <span class="label">MODIFIED:</span>
-              <span class="value text-muted">{{ formatDate(datapoolStore.selectedDatapool.modified) }}</span>
-            </div>
+    <Modal
+      :show="showPreview"
+      :title="datapoolStore.selectedDatapool?.name || ''"
+      @close="closePreview"
+    >
+      <div v-if="datapoolStore.selectedDatapool">
+        <div class="preview-stats">
+          <div class="stat-row">
+            <span class="label">LINES:</span>
+            <span class="value text-cyan">{{ datapoolStore.selectedDatapool.line_count.toLocaleString() }}</span>
           </div>
-
-          <div class="preview-content">
-            <h4 class="preview-label">PREVIEW (FIRST 10 LINES):</h4>
-            <pre class="preview-lines mono">{{ datapoolStore.selectedDatapool.preview?.join('\n') || 'No preview available' }}</pre>
+          <div class="stat-row">
+            <span class="label">SIZE:</span>
+            <span class="value text-amber">{{ formatBytes(datapoolStore.selectedDatapool.size) }}</span>
+          </div>
+          <div class="stat-row">
+            <span class="label">MODIFIED:</span>
+            <span class="value text-muted">{{ formatDate(datapoolStore.selectedDatapool.modified) }}</span>
           </div>
         </div>
 
-        <div class="modal-actions">
-          <button @click="downloadDatapool(datapoolStore.selectedDatapool?.name)" class="download-btn">
-            DOWNLOAD
-          </button>
-          <button @click="closePreview">CLOSE</button>
+        <div class="preview-content">
+          <h4 class="preview-label">PREVIEW (FIRST 10 LINES):</h4>
+          <pre class="preview-lines mono">{{ datapoolStore.selectedDatapool.preview?.join('\n') || 'No preview available' }}</pre>
         </div>
       </div>
-    </div>
+
+      <template #actions>
+        <button @click="downloadDatapool(datapoolStore.selectedDatapool?.name)">
+          DOWNLOAD
+        </button>
+        <button @click="closePreview">CLOSE</button>
+      </template>
+    </Modal>
 
     <!-- Delete Confirmation Modal -->
-    <div v-if="showDeleteConfirm" class="modal-overlay" @click.self="showDeleteConfirm = false">
-      <div class="modal-content panel confirm-modal">
-        <div class="modal-header">
-          <h3 class="modal-title text-danger">⚠️ CONFIRM DELETE</h3>
-        </div>
-
-        <div class="modal-body">
-          <p>Are you sure you want to delete this datapool?</p>
-          <p class="datapool-name-confirm mono text-cyan">{{ datapoolToDelete }}</p>
-          <p class="text-muted">This action cannot be undone.</p>
-        </div>
-
-        <div class="modal-actions">
-          <button @click="deleteDatapool" class="danger" :disabled="datapoolStore.isLoading">
-            {{ datapoolStore.isLoading ? 'DELETING...' : 'DELETE' }}
-          </button>
-          <button @click="showDeleteConfirm = false">CANCEL</button>
-        </div>
+    <Modal
+      :show="showDeleteConfirm"
+      title="⚠️ CONFIRM DELETE"
+      title-class="text-danger"
+      max-width="600px"
+      @close="showDeleteConfirm = false"
+    >
+      <div class="confirm-modal-body">
+        <p>Are you sure you want to delete this datapool?</p>
+        <p class="datapool-name-confirm mono text-cyan">{{ datapoolToDelete }}</p>
+        <p class="text-muted">This action cannot be undone.</p>
       </div>
-    </div>
+
+      <template #actions>
+        <button @click="deleteDatapool" class="danger" :disabled="datapoolStore.isLoading">
+          {{ datapoolStore.isLoading ? 'DELETING...' : 'DELETE' }}
+        </button>
+        <button @click="showDeleteConfirm = false">CANCEL</button>
+      </template>
+    </Modal>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useDatapoolStore } from '../stores/datapoolStore'
+import { formatBytes, formatDate } from '../utils/formatters'
+import Modal from '../components/Modal.vue'
 
 const datapoolStore = useDatapoolStore()
 
@@ -306,14 +305,6 @@ async function deleteDatapool() {
   } catch (error) {
     console.error('Failed to delete datapool:', error)
   }
-}
-
-function formatBytes(bytes) {
-  return datapoolStore.formatBytes(bytes)
-}
-
-function formatDate(timestamp) {
-  return datapoolStore.formatDate(timestamp)
 }
 </script>
 
@@ -602,68 +593,7 @@ function formatDate(timestamp) {
   margin-bottom: 1rem;
 }
 
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(4px);
-}
-
-.modal-content {
-  max-width: 800px;
-  width: 90%;
-  max-height: 80vh;
-  overflow-y: auto;
-  padding: 2rem;
-  background: var(--bg-primary);
-  border: 2px solid var(--cyan);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--cyan);
-}
-
-.modal-title {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--cyan);
-}
-
-.close-btn {
-  background: transparent;
-  border: none;
-  font-size: 2rem;
-  cursor: pointer;
-  color: var(--text-muted);
-  padding: 0;
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.close-btn:hover {
-  color: var(--danger);
-}
-
-.modal-body {
-  margin-bottom: 1.5rem;
-}
-
+/* Modal Content Styles */
 .preview-stats {
   display: flex;
   gap: 2rem;
@@ -694,13 +624,7 @@ function formatDate(timestamp) {
   color: var(--text-primary);
 }
 
-.modal-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-}
-
-.confirm-modal .modal-body {
+.confirm-modal-body {
   text-align: center;
 }
 

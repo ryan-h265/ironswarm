@@ -51,26 +51,28 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useClusterStore } from './stores/clusterStore'
 import { useMetricsStore } from './stores/metricsStore'
 import { useWebSocketStore } from './stores/websocketStore'
 
+const router = useRouter()
 const clusterStore = useClusterStore()
 const metricsStore = useMetricsStore()
 const wsStore = useWebSocketStore()
 
 const currentTime = ref('')
 
-const routes = [
-  { path: '/', name: 'Cluster', icon: '⬢' },
-  { path: '/scenarios', name: 'Scenarios', icon: '⚡' },
-  { path: '/scenario-builder', name: 'Builder', icon: '⚙️' },
-  { path: '/datapools', name: 'Datapools', icon: '💾' },
-  { path: '/metrics', name: 'Metrics', icon: '◈' },
-  { path: '/graphs', name: 'Graphs', icon: '▲' },
-  { path: '/historical', name: 'Historical', icon: '◉' },
-  { path: '/reports', name: 'Reports', icon: '▣' },
-]
+// Derive navigation routes from router configuration
+const routes = computed(() => {
+  return router.getRoutes()
+    .filter(route => route.meta?.icon) // Only include routes with navigation metadata
+    .map(route => ({
+      path: route.path,
+      name: route.meta.displayName || route.name,
+      icon: route.meta.icon
+    }))
+})
 
 // Update time display
 let timeInterval

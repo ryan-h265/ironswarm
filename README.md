@@ -26,6 +26,7 @@
 
 - [Installation](#installation)
 - [Usage](#usage)
+- [Web Dashboard](#web-dashboard)
 - [Docker](#docker)
 - [Development](#development)
 - [License](#license)
@@ -74,6 +75,37 @@ Run a single node bootstrapping to another node
 ```bash
 ironswarm -H local -b tcp://127.0.0.1:42042
 ```
+
+## Web Dashboard
+
+IronSwarm includes a built-in web dashboard for real-time monitoring and control of your load tests. The dashboard provides:
+
+- **Real-time metrics** - Live graphs showing throughput, latency, and error rates
+- **Cluster management** - View all connected nodes and their status
+- **Scenario control** - Start, stop, and configure load test scenarios
+- **Historical data** - View past test runs and compare results
+- **Datapool management** - Upload and manage test data files
+
+### Enabling the Dashboard
+
+Start IronSwarm with the `--web-port` flag to enable the web interface:
+
+```bash
+ironswarm --web-port 8080
+```
+
+Then open your browser to `http://localhost:8080`
+
+### Dashboard Features
+
+- **Metrics View**: Real-time charts showing requests/sec, latency percentiles, and error rates
+- **Scenario Builder**: Visual interface for creating and editing test scenarios
+- **Cluster View**: Monitor all nodes in your distributed test cluster
+- **Reports**: Generate and download detailed test reports
+
+### No npm Required
+
+The web dashboard is pre-built and shipped with IronSwarm - no need to install Node.js or npm. Just install via pip
 
 ## Docker
 

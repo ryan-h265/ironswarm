@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import axios from 'axios'
+import { formatBytes, formatDate } from '../utils/formatters'
 
 export const useDatapoolStore = defineStore('datapools', () => {
   // State
@@ -23,19 +24,6 @@ export const useDatapoolStore = defineStore('datapools', () => {
   const formattedTotalSize = computed(() => {
     return formatBytes(totalSize.value)
   })
-
-  // Helper functions
-  function formatBytes(bytes) {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
-  }
-
-  function formatDate(timestamp) {
-    return new Date(timestamp * 1000).toLocaleString()
-  }
 
   // Actions
   async function fetchDatapools() {

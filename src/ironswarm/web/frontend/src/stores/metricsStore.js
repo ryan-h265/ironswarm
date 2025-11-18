@@ -9,19 +9,19 @@ export const useMetricsStore = defineStore('metrics', () => {
   const history = ref([])
   const maxHistoryLength = 300 // 5 minutes at 1 update/second
 
+  // Helpers (defined early for use in computed properties)
+  function calculateTotalFromCounter(metric) {
+    if (!metric?.samples || !Array.isArray(metric.samples)) return 0
+    return metric.samples.reduce((sum, sample) => sum + (sample.value || 0), 0)
+  }
+
   // Getters (handle collector format with samples arrays)
   const totalRequests = computed(() => {
-    if (!currentSnapshot.value?.counters?.ironswarm_http_requests_total) return 0
-    const metric = currentSnapshot.value.counters.ironswarm_http_requests_total
-    if (!metric.samples || !Array.isArray(metric.samples)) return 0
-    return metric.samples.reduce((sum, sample) => sum + (sample.value || 0), 0)
+    return calculateTotalFromCounter(currentSnapshot.value?.counters?.ironswarm_http_requests_total)
   })
 
   const totalErrors = computed(() => {
-    if (!currentSnapshot.value?.counters?.ironswarm_http_errors_total) return 0
-    const metric = currentSnapshot.value.counters.ironswarm_http_errors_total
-    if (!metric.samples || !Array.isArray(metric.samples)) return 0
-    return metric.samples.reduce((sum, sample) => sum + (sample.value || 0), 0)
+    return calculateTotalFromCounter(currentSnapshot.value?.counters?.ironswarm_http_errors_total)
   })
 
   const errorRate = computed(() => {
@@ -32,17 +32,11 @@ export const useMetricsStore = defineStore('metrics', () => {
   })
 
   const totalJourneys = computed(() => {
-    if (!currentSnapshot.value?.counters?.ironswarm_journey_executions_total) return 0
-    const metric = currentSnapshot.value.counters.ironswarm_journey_executions_total
-    if (!metric.samples || !Array.isArray(metric.samples)) return 0
-    return metric.samples.reduce((sum, sample) => sum + (sample.value || 0), 0)
+    return calculateTotalFromCounter(currentSnapshot.value?.counters?.ironswarm_journey_executions_total)
   })
 
   const journeyFailures = computed(() => {
-    if (!currentSnapshot.value?.counters?.ironswarm_journey_failures_total) return 0
-    const metric = currentSnapshot.value.counters.ironswarm_journey_failures_total
-    if (!metric.samples || !Array.isArray(metric.samples)) return 0
-    return metric.samples.reduce((sum, sample) => sum + (sample.value || 0), 0)
+    return calculateTotalFromCounter(currentSnapshot.value?.counters?.ironswarm_journey_failures_total)
   })
 
   const latencyP50 = computed(() => {
@@ -73,12 +67,6 @@ export const useMetricsStore = defineStore('metrics', () => {
 
     return (reqDiff / timeDiff).toFixed(2)
   })
-
-  // Helpers
-  function calculateTotalFromCounter(metric) {
-    if (!metric?.samples || !Array.isArray(metric.samples)) return 0
-    return metric.samples.reduce((sum, sample) => sum + (sample.value || 0), 0)
-  }
 
   function calculatePercentile(histogram, percentile) {
     // Handle collector format with samples array
@@ -156,15 +144,6 @@ export const useMetricsStore = defineStore('metrics', () => {
   }
 
   function updateFromWebSocket(data) {
-    // Debug: Log the structure we're receiving
-    console.log('WebSocket metrics update received:', {
-      hasCounters: !!data?.counters,
-      hasHistograms: !!data?.histograms,
-      counterKeys: Object.keys(data?.counters || {}),
-      histogramKeys: Object.keys(data?.histograms || {}),
-      sampleStructure: data?.counters?.ironswarm_http_requests_total?.samples?.[0]
-    })
-
     currentSnapshot.value = data
     addToHistory(data)
   }

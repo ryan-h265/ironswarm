@@ -308,103 +308,89 @@
     </div>
 
     <!-- Datapool Modal -->
-    <div v-if="showDatapoolModal" class="modal-overlay" @click.self="showDatapoolModal = false">
-      <div class="modal-content panel">
-        <div class="modal-header">
-          <h3 class="modal-title">CONFIGURE DATAPOOL</h3>
-          <button @click="showDatapoolModal = false" class="close-btn">✕</button>
+    <Modal
+      :show="showDatapoolModal"
+      title="CONFIGURE DATAPOOL"
+      @close="showDatapoolModal = false"
+    >
+      <div class="config-item">
+        <label class="label">DATAPOOL TYPE:</label>
+        <select v-model="datapoolForm.type" class="mono">
+          <option value="RecyclableDatapool">RecyclableDatapool (in-memory, wraps)</option>
+          <option value="IterableDatapool">IterableDatapool (in-memory)</option>
+          <option value="FileDatapool">FileDatapool (file-based)</option>
+          <option value="RecyclableFileDatapool">RecyclableFileDatapool (file-based, wraps)</option>
+        </select>
+      </div>
+
+      <div class="config-item">
+        <label class="label">SOURCE:</label>
+        <div v-if="datapoolForm.type.includes('File')">
+          <select v-model="datapoolForm.source" class="mono">
+            <option value="">Select a datapool file...</option>
+            <option v-for="dp in datapoolStore.datapools" :key="dp.name" :value="dp.name">
+              {{ dp.name }} ({{ dp.line_count }} lines)
+            </option>
+          </select>
+          <p class="text-muted">Select from uploaded datapool files</p>
         </div>
-
-        <div class="modal-body">
-          <div class="config-item">
-            <label class="label">DATAPOOL TYPE:</label>
-            <select v-model="datapoolForm.type" class="mono">
-              <option value="RecyclableDatapool">RecyclableDatapool (in-memory, wraps)</option>
-              <option value="IterableDatapool">IterableDatapool (in-memory)</option>
-              <option value="FileDatapool">FileDatapool (file-based)</option>
-              <option value="RecyclableFileDatapool">RecyclableFileDatapool (file-based, wraps)</option>
-            </select>
-          </div>
-
-          <div class="config-item">
-            <label class="label">SOURCE:</label>
-            <div v-if="datapoolForm.type.includes('File')">
-              <select v-model="datapoolForm.source" class="mono">
-                <option value="">Select a datapool file...</option>
-                <option v-for="dp in datapoolStore.datapools" :key="dp.name" :value="dp.name">
-                  {{ dp.name }} ({{ dp.line_count }} lines)
-                </option>
-              </select>
-              <p class="text-muted">Select from uploaded datapool files</p>
-            </div>
-            <div v-else>
-              <textarea
-                v-model="datapoolForm.source"
-                placeholder="[1, 2, 3, 4, 5] or range(1, 100)"
-                class="mono"
-                rows="3"
-              ></textarea>
-              <p class="text-muted">Python expression for iterable (e.g., [1,2,3] or range(10))</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="modal-actions">
-          <button @click="applyDatapool" :disabled="!datapoolForm.source">APPLY</button>
-          <button @click="showDatapoolModal = false">CANCEL</button>
+        <div v-else>
+          <textarea
+            v-model="datapoolForm.source"
+            placeholder="[1, 2, 3, 4, 5] or range(1, 100)"
+            class="mono"
+            rows="3"
+          ></textarea>
+          <p class="text-muted">Python expression for iterable (e.g., [1,2,3] or range(10))</p>
         </div>
       </div>
-    </div>
+
+      <template #actions>
+        <button @click="applyDatapool" :disabled="!datapoolForm.source">APPLY</button>
+        <button @click="showDatapoolModal = false">CANCEL</button>
+      </template>
+    </Modal>
 
     <!-- Curl Import Modal -->
-    <div v-if="showCurlModal" class="modal-overlay" @click.self="showCurlModal = false">
-      <div class="modal-content panel">
-        <div class="modal-header">
-          <h3 class="modal-title">IMPORT FROM CURL</h3>
-          <button @click="showCurlModal = false" class="close-btn">✕</button>
-        </div>
+    <Modal
+      :show="showCurlModal"
+      title="IMPORT FROM CURL"
+      @close="showCurlModal = false"
+    >
+      <textarea
+        v-model="curlCommand"
+        placeholder="curl -X POST https://api.example.com/endpoint -H &quot;Content-Type: application/json&quot; -d &quot;{\&quot;key\&quot;:\&quot;value\&quot;}&quot;"
+        class="curl-textarea mono"
+        rows="8"
+      ></textarea>
 
-        <div class="modal-body">
-          <textarea
-            v-model="curlCommand"
-            placeholder="curl -X POST https://api.example.com/endpoint -H &quot;Content-Type: application/json&quot; -d &quot;{\&quot;key\&quot;:\&quot;value\&quot;}&quot;"
-            class="curl-textarea mono"
-            rows="8"
-          ></textarea>
-        </div>
-
-        <div class="modal-actions">
-          <button @click="importCurl" :disabled="!curlCommand">IMPORT</button>
-          <button @click="showCurlModal = false">CANCEL</button>
-        </div>
-      </div>
-    </div>
+      <template #actions>
+        <button @click="importCurl" :disabled="!curlCommand">IMPORT</button>
+        <button @click="showCurlModal = false">CANCEL</button>
+      </template>
+    </Modal>
 
     <!-- Code Preview Modal -->
-    <div v-if="showCodePreview" class="modal-overlay" @click.self="showCodePreview = false">
-      <div class="modal-content panel code-preview-modal">
-        <div class="modal-header">
-          <h3 class="modal-title">PYTHON CODE PREVIEW</h3>
-          <button @click="showCodePreview = false" class="close-btn">✕</button>
-        </div>
-
-        <div class="modal-body">
-          <div v-if="store.isLoading" class="loading-state">
-            <div class="loading-spinner">⟳</div>
-            <p>Generating code...</p>
-          </div>
-          <div v-else>
-            <pre class="code-preview mono">{{ store.generatedCode }}</pre>
-          </div>
-        </div>
-
-        <div class="modal-actions">
-          <button @click="copyCode" class="copy-btn">📋 COPY</button>
-          <button @click="saveFromPreview" class="primary">SAVE TO FILE</button>
-          <button @click="showCodePreview = false">CLOSE</button>
-        </div>
+    <Modal
+      :show="showCodePreview"
+      title="PYTHON CODE PREVIEW"
+      max-width="1000px"
+      @close="showCodePreview = false"
+    >
+      <div v-if="store.isLoading" class="loading-state">
+        <div class="loading-spinner">⟳</div>
+        <p>Generating code...</p>
       </div>
-    </div>
+      <div v-else>
+        <pre class="code-preview mono">{{ store.generatedCode }}</pre>
+      </div>
+
+      <template #actions>
+        <button @click="copyCode">📋 COPY</button>
+        <button @click="saveFromPreview" class="primary">SAVE TO FILE</button>
+        <button @click="showCodePreview = false">CLOSE</button>
+      </template>
+    </Modal>
 
     <!-- Status Messages -->
     <div v-if="statusMessage" :class="['status-toast', statusMessage.type]">
@@ -417,6 +403,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useScenarioBuilderStore } from '../stores/scenarioBuilderStore'
 import { useDatapoolStore } from '../stores/datapoolStore'
+import Modal from '../components/Modal.vue'
 
 const store = useScenarioBuilderStore()
 const datapoolStore = useDatapoolStore()
@@ -1121,75 +1108,7 @@ async function loadExistingScenario() {
   margin-bottom: 1rem;
 }
 
-/* Modals */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(4px);
-}
-
-.modal-content {
-  max-width: 800px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  padding: 2rem;
-  background: var(--bg-primary);
-  border: 2px solid var(--cyan);
-}
-
-.code-preview-modal {
-  max-width: 1200px;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--cyan);
-}
-
-.modal-title {
-  margin: 0;
-  font-size: 1.5rem;
-  color: var(--cyan);
-}
-
-.close-btn {
-  background: transparent;
-  border: none;
-  font-size: 2rem;
-  cursor: pointer;
-  color: var(--text-muted);
-  padding: 0;
-  width: 40px;
-  height: 40px;
-}
-
-.close-btn:hover {
-  color: var(--danger);
-}
-
-.modal-body {
-  margin-bottom: 1.5rem;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-}
-
+/* Modal Content Styles */
 .curl-textarea {
   width: 100%;
   padding: 1rem;
@@ -1259,64 +1178,6 @@ async function loadExistingScenario() {
     transform: translateX(0);
     opacity: 1;
   }
-}
-
-/* Buttons */
-button {
-  padding: 0.75rem 1.5rem;
-  background: var(--bg-secondary);
-  border: 1px solid var(--cyan);
-  color: var(--cyan);
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
-  font-weight: bold;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-transform: uppercase;
-}
-
-button:hover:not(:disabled) {
-  background: var(--cyan);
-  color: var(--bg-primary);
-  box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
-}
-
-button:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-button.danger {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-button.danger:hover:not(:disabled) {
-  background: var(--danger);
-  color: var(--bg-primary);
-}
-
-button.primary {
-  border-color: var(--success);
-  color: var(--success);
-}
-
-button.primary:hover:not(:disabled) {
-  background: var(--success);
-  color: var(--bg-primary);
-}
-
-button.add-btn {
-  border-color: var(--amber);
-  color: var(--amber);
-  padding: 0.5rem 1rem;
-  font-size: 0.75rem;
-}
-
-button.add-btn:hover:not(:disabled) {
-  background: var(--amber);
-  color: var(--bg-primary);
 }
 
 .empty-state {

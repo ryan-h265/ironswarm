@@ -120,6 +120,7 @@
 import { computed } from 'vue'
 import { useMetricsStore } from '../stores/metricsStore'
 import { useWebSocketStore } from '../stores/websocketStore'
+import { formatNumber } from '../utils/formatters'
 
 const metricsStore = useMetricsStore()
 const wsStore = useWebSocketStore()
@@ -135,12 +136,6 @@ const formattedSnapshot = computed(() => {
   if (!metricsStore.currentSnapshot) return 'NO DATA'
   return JSON.stringify(metricsStore.currentSnapshot, null, 2)
 })
-
-function formatNumber(num) {
-  if (num >= 1000000) return (num / 1000000).toFixed(2) + 'M'
-  if (num >= 1000) return (num / 1000).toFixed(2) + 'K'
-  return num.toString()
-}
 
 function calculateBarWidth(value) {
   // Normalize to 0-100 based on max value being around 2000ms
