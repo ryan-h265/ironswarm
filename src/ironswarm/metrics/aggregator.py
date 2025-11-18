@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
 from time import time
-from typing import Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from ironswarm.metrics_snapshot import MetricsSnapshot
 
@@ -87,6 +87,48 @@ def get_per_node_snapshots(snapshots: Iterable[MetricsSnapshot]) -> list[dict]:
     return per_node
 
 
+def get_time_series(
+    snapshots: Iterable[MetricsSnapshot],
+    metric_name: str,
+    metric_type: str = "counter",
+) -> list[dict[str, Any]]:
+    """Return a time series for a specific metric across nodes."""
+    series: list[dict[str, Any]] = []
+    for snapshot in sorted(snapshots, key=lambda s: s.timestamp):
+        data = snapshot.snapshot_data or {}
+        if metric_type == "counter":
+            metric = data.get("counters", {}).get(metric_name)
+            if metric:
+                series.append(
+                    {
+                        "timestamp": snapshot.timestamp,
+                        "node_identity": snapshot.node_identity,
+                        "samples": metric.get("samples", []),
+                    }
+                )
+        elif metric_type == "histogram":
+            metric = data.get("histograms", {}).get(metric_name)
+            if metric:
+                series.append(
+                    {
+                        "timestamp": snapshot.timestamp,
+                        "node_identity": snapshot.node_identity,
+                        "samples": metric.get("samples", []),
+                    }
+                )
+        elif metric_type == "event":
+            events = data.get("events", {}).get(metric_name, [])
+            if events:
+                series.append(
+                    {
+                        "timestamp": snapshot.timestamp,
+                        "node_identity": snapshot.node_identity,
+                        "events": events,
+                    }
+                )
+    return series
+
+
 def _aggregate_snapshots(snapshots: Sequence[MetricsSnapshot]) -> dict:
     counters: dict[str, _CounterAccumulator] = {}
     histograms: dict[str, _HistogramAccumulator] = {}
@@ -107,7 +149,7 @@ def _aggregate_snapshots(snapshots: Sequence[MetricsSnapshot]) -> dict:
         "node_count": len(node_ids),
         "counters": _finalize_counters(counters),
         "histograms": _finalize_histograms(histograms),
-        "events": dict(events),
+        "events": _finalize_events(events),
     }
     return aggregated
 
@@ -218,6 +260,15 @@ def _finalize_histograms(histograms: Mapping[str, _HistogramAccumulator]) -> dic
             "type": "histogram",
             "samples": samples,
         }
+    return finalized
+
+
+def _finalize_events(events: Mapping[str, list]) -> dict[str, list]:
+    finalized: dict[str, list] = {}
+    for name, entries in events.items():
+        if not isinstance(entries, list):
+            continue
+        finalized[name] = sorted(entries, key=lambda entry: entry.get("timestamp", 0))
     return finalized
 
 
