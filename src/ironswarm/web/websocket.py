@@ -14,6 +14,7 @@ import aiohttp
 from aiohttp import web
 
 from ironswarm.metrics.collector import collector
+from ironswarm.metrics import aggregator
 
 logger = logging.getLogger(__name__)
 
@@ -112,9 +113,21 @@ class WebSocketManager:
         }
 
     def _get_metrics_data(self):
-        """Get current metrics snapshot from global collector."""
-        # Get metrics from global collector (don't reset - preserve for multiple clients)
+        """Get converged metrics snapshot across the cluster."""
+        aggregated = None
+        if hasattr(self.node, "_get_snapshots_from_crdt"):
+            snapshots = self.node._get_snapshots_from_crdt()
+            if snapshots:
+                aggregated = aggregator.get_cluster_snapshot(snapshots)
+
+        if aggregated:
+            aggregated["scope"] = "cluster"
+            return aggregated
+
         snapshot = collector.snapshot(reset=False)
+        snapshot["scope"] = "node"
+        snapshot["node_identity"] = self.node.identity
+        snapshot.setdefault("node_count", 1)
         return snapshot
 
     async def _get_scenarios_data(self):
